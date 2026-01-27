@@ -1,0 +1,47 @@
+{
+  "name": "resonate",
+  "version": "1.0.0",
+  "description": "Resonate Creative Agency Platform",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@fal-ai/client": "^1.8.3",
+    "@fal-ai/server-proxy": "^1.1.2",
+    "@hookform/resolvers": "^3.3.4",
+    "@stripe/stripe-js": "^2.4.0",
+    "@supabase/ssr": "^0.1.0",
+    "@supabase/supabase-js": "^2.39.7",
+    "@tanstack/react-query": "^5.90.17",
+    "autoprefixer": "^10.4.17",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.3.1",
+    "framer-motion": "^11.0.5",
+    "idb": "^8.0.3",
+    "lucide-react": "^0.330.0",
+    "nanoid": "^5.1.6",
+    "next": "14.1.0",
+    "postcss": "^8.4.35",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.50.1",
+    "stripe": "^14.17.0",
+    "tailwind-merge": "^2.2.1",
+    "tailwindcss": "^3.4.1",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "@types/react": "^18.2.57",
+    "@types/react-dom": "^18.2.19",
+    "@types/uuid": "^9.0.8",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
+    "typescript": "^5.3.3"
+  }
+}

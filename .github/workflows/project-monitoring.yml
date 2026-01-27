@@ -1,0 +1,98 @@
+name: Project Health Monitoring
+
+on:
+  schedule:
+    # Run at 9 AM UTC every day
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (do not send notifications)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  CRON_SECRET: ${{ secrets.CRON_SECRET }}
+  API_URL: ${{ vars.API_URL || 'https://resonate.vercel.app' }}
+
+jobs:
+  monitor-projects:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check projects health
+        id: health-check
+        run: |
+          echo "Starting project health monitoring..."
+          echo "API URL: $API_URL"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            "$API_URL/api/cron/project-monitoring")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::Health check failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          # Parse the response
+          CHECKED=$(echo "$BODY" | jq -r '.checked // 0')
+          SUCCESS=$(echo "$BODY" | jq -r '.success // false')
+
+          echo "Projects checked: $CHECKED"
+          echo "Success: $SUCCESS"
+
+          # Set outputs for potential downstream jobs
+          echo "checked=$CHECKED" >> $GITHUB_OUTPUT
+          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Log results
+        if: always()
+        run: |
+          echo "=== Health Monitoring Results ==="
+          echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "Projects checked: ${{ steps.health-check.outputs.checked }}"
+          echo "Success: ${{ steps.health-check.outputs.success }}"
+
+          # Log detailed results if available
+          if [ -n "${{ steps.health-check.outputs.body }}" ]; then
+            echo ""
+            echo "=== Detailed Results ==="
+            echo '${{ steps.health-check.outputs.body }}' | jq -r '.results[]? | "Project: \(.projectName) | Score: \(.score) | Status: \(.status)"' 2>/dev/null || true
+          fi
+
+      - name: Alert on failures
+        if: failure()
+        run: |
+          echo "::warning::Project monitoring job failed. Check the logs for details."
+          # Add additional alerting here if needed (Slack, Discord, etc.)
+
+  # Optional: Weekly summary report
+  weekly-summary:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 9 * * 1'  # Only on Mondays
+    needs: monitor-projects
+
+    steps:
+      - name: Generate weekly summary
+        run: |
+          echo "=== Weekly Project Health Summary ==="
+          echo "Date: $(date -u +"%Y-%m-%d")"
+          echo ""
+          echo "This week's monitoring is complete."
+          echo "Review the Resonate dashboard for detailed analytics."
+          echo ""
+          echo "Dashboard: $API_URL/dashboard"

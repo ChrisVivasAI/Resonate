@@ -1,0 +1,7 @@
+export { Header } from './header'
+export { Hero } from './hero'
+export { Manifesto } from './manifesto'
+export { Partners } from './partners'
+export { Services } from './services'
+export { Contact } from './contact'
+export { ServicePageTemplate } from './service-page-template'
