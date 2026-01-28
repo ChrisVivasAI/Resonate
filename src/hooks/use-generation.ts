@@ -2,38 +2,47 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  fal,
-  AVAILABLE_ENDPOINTS,
-  getEndpointById,
-  mapInputKey,
+  getEndpoint,
+  getSubModesForCategory,
   type MediaCategory,
-} from '@/lib/ai/fal'
+  type SubMode,
+  type GeminiEndpointConfig,
+} from '@/lib/ai/gemini-media'
+import {
+  DEFAULT_IMAGE_SETTINGS,
+  DEFAULT_VIDEO_SETTINGS,
+  getValidVideoDuration,
+  type ImageSettings,
+  type VideoSettings,
+} from '@/lib/ai/presets'
 import { useAuth } from './use-auth'
 import { useGenerations, type AIGeneration } from './use-data'
 
 export interface GenerateData {
   prompt: string
   image?: File | string | null
-  video_url?: File | string | null
-  audio_url?: File | string | null
-  reference_audio_url?: File | string | null
-  duration: number
-  voice: string
-  advanced_camera_control?: {
-    movement_value: number
-    movement_type: string
-  }
-  [key: string]: unknown
+  mask?: File | string | null
 }
 
 const DEFAULT_GENERATE_DATA: GenerateData = {
   prompt: '',
   image: null,
-  video_url: null,
-  audio_url: null,
-  reference_audio_url: null,
-  duration: 30,
-  voice: 'Dexter (English (US)/American)',
+  mask: null,
+}
+
+// Convert file to base64
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      // Remove the data URL prefix to get just the base64 data
+      const base64 = result.split(',')[1]
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
 export function useGeneration() {
@@ -48,34 +57,52 @@ export function useGeneration() {
     getCompletedGenerations,
   } = useGenerations(user?.id)
 
-  // Local form state
-  const [mediaType, setMediaType] = useState<MediaCategory>('image')
-  const [endpointId, setEndpointIdState] = useState(AVAILABLE_ENDPOINTS[0].endpointId)
+  // Mode state
+  const [mediaType, setMediaTypeState] = useState<MediaCategory>('image')
+  const [subMode, setSubModeState] = useState<SubMode>('text-to-image')
+
+  // Settings state
+  const [imageSettings, setImageSettingsState] = useState<ImageSettings>({ ...DEFAULT_IMAGE_SETTINGS })
+  const [videoSettings, setVideoSettingsState] = useState<VideoSettings>({ ...DEFAULT_VIDEO_SETTINGS })
+
+  // Form state
   const [generateData, setGenerateDataState] = useState<GenerateData>({ ...DEFAULT_GENERATE_DATA })
   const [isGenerating, setIsGenerating] = useState(false)
 
-  const endpoint = getEndpointById(endpointId)
+  // Latest result (for immediate display even if DB insert fails)
+  const [latestResult, setLatestResult] = useState<AIGeneration | null>(null)
 
-  // Update endpoint when media type changes
-  const handleSetMediaType = useCallback((type: MediaCategory) => {
-    const ep = AVAILABLE_ENDPOINTS.find((e) => e.category === type)
-    setMediaType(type)
-    setEndpointIdState(ep?.endpointId || AVAILABLE_ENDPOINTS[0].endpointId)
-    setGenerateDataState({
-      ...DEFAULT_GENERATE_DATA,
-      ...(ep?.preset || {}),
-      ...(ep?.initialInput || {}),
-    })
+  // Get current endpoint config
+  const endpoint = getEndpoint(mediaType, subMode)
+
+  // Handle media type change
+  const setMediaType = useCallback((type: MediaCategory) => {
+    setMediaTypeState(type)
+    const availableSubModes = getSubModesForCategory(type)
+    setSubModeState(availableSubModes[0])
+    setGenerateDataState({ ...DEFAULT_GENERATE_DATA })
   }, [])
 
-  const handleSetEndpointId = useCallback((id: string) => {
-    const ep = AVAILABLE_ENDPOINTS.find((e) => e.endpointId === id)
-    setEndpointIdState(id)
-    setGenerateDataState((prev) => ({
-      ...prev,
-      ...(ep?.preset || {}),
-      ...(ep?.initialInput || {}),
-    }))
+  // Handle sub-mode change
+  const setSubMode = useCallback((mode: SubMode) => {
+    setSubModeState(mode)
+    setGenerateDataState({ ...DEFAULT_GENERATE_DATA })
+  }, [])
+
+  // Settings setters
+  const setImageSettings = useCallback((settings: Partial<ImageSettings>) => {
+    setImageSettingsState((prev) => ({ ...prev, ...settings }))
+  }, [])
+
+  const setVideoSettings = useCallback((settings: Partial<VideoSettings>) => {
+    setVideoSettingsState((prev) => {
+      const newSettings = { ...prev, ...settings }
+      // Enforce duration constraints for high resolutions
+      if (settings.resolution) {
+        newSettings.duration = getValidVideoDuration(newSettings.resolution, newSettings.duration)
+      }
+      return newSettings
+    })
   }, [])
 
   const setGenerateData = useCallback((data: Partial<GenerateData>) => {
@@ -83,70 +110,52 @@ export function useGeneration() {
   }, [])
 
   const resetGenerateData = useCallback(() => {
-    const ep = AVAILABLE_ENDPOINTS.find((e) => e.endpointId === endpointId)
-    setGenerateDataState({
-      ...DEFAULT_GENERATE_DATA,
-      ...(ep?.preset || {}),
-      ...(ep?.initialInput || {}),
-    })
-  }, [endpointId])
+    setGenerateDataState({ ...DEFAULT_GENERATE_DATA })
+  }, [])
 
-  // Poll for generation status
+  // Poll for video generation status (Veo 3.1)
   useEffect(() => {
     const pendingGens = getPendingGenerations()
+    // Video generations store operationId in request_id field
+    const videoGens = pendingGens.filter((g) => g.type === 'video' && g.request_id)
 
-    if (pendingGens.length === 0) return
+    if (videoGens.length === 0) return
 
     const pollInterval = setInterval(async () => {
-      for (const gen of pendingGens) {
-        if (!gen.request_id || !gen.endpoint_id) continue
+      for (const gen of videoGens) {
+        const operationId = gen.request_id
+        if (!operationId) continue
 
         try {
-          const status = await fal.queue.status(gen.endpoint_id, {
-            requestId: gen.request_id,
-          })
+          // Pass userId for Supabase storage upload when video is ready
+          const userId = gen.user_id || user?.id
+          const params = new URLSearchParams({ operationId })
+          if (userId) params.append('userId', userId)
 
-          if (status.status === 'IN_PROGRESS' && gen.status !== 'running') {
+          const response = await fetch(`/api/ai/video?${params.toString()}`)
+          const status = await response.json()
+
+          if (status.status === 'running' && gen.status !== 'running') {
             await updateInDb(gen.id, { status: 'running' })
-          } else if (status.status === 'COMPLETED') {
-            const result = await fal.queue.result(gen.endpoint_id, {
-              requestId: gen.request_id,
-            })
-
-            // Extract result URL
-            const resultData = result.data as Record<string, unknown>
-            let resultUrl: string | null = null
-
-            if (resultData.images && Array.isArray(resultData.images)) {
-              resultUrl = (resultData.images[0] as { url: string })?.url || null
-            } else if (resultData.video && typeof resultData.video === 'object') {
-              resultUrl = (resultData.video as { url: string })?.url || null
-            } else if (resultData.audio && typeof resultData.audio === 'object') {
-              resultUrl = (resultData.audio as { url: string })?.url || null
-            } else if (resultData.audio_url) {
-              resultUrl = resultData.audio_url as string
-            } else if (resultData.url) {
-              resultUrl = resultData.url as string
-            }
-
+          } else if (status.done && status.status === 'completed' && status.videoUrl) {
             await updateInDb(gen.id, {
               status: 'completed',
-              result_data: resultData,
-              result_url: resultUrl,
+              result_url: status.videoUrl,
+              result_data: { videoUrl: status.videoUrl, urls: [status.videoUrl] },
               completed_at: new Date().toISOString(),
             })
-          } else if ((status.status as string) === 'FAILED') {
+          } else if (status.done && status.status === 'failed') {
             await updateInDb(gen.id, {
               status: 'failed',
-              error_message: 'Generation failed',
+              error_message: status.error || 'Video generation failed',
               completed_at: new Date().toISOString(),
             })
           }
         } catch (error) {
-          console.error('Error polling generation status:', error)
+          console.error('Error polling video status:', error)
         }
       }
-    }, 3000)
+    }, 10000) // Poll every 10 seconds for video
 
     return () => clearInterval(pollInterval)
   }, [generations, getPendingGenerations, updateInDb])
@@ -157,88 +166,184 @@ export function useGeneration() {
     setIsGenerating(true)
 
     try {
-      // Build input based on endpoint requirements
-      const input: Record<string, unknown> = {
-        ...(endpoint.initialInput || {}),
-        prompt: generateData.prompt,
-      }
-
-      // Add image size/aspect ratio
       if (mediaType === 'image') {
-        input.image_size = 'landscape_16_9'
-      } else if (mediaType === 'video') {
-        input.aspect_ratio = '16:9'
-        if (generateData.duration) {
-          input.seconds_total = generateData.duration
+        // Image generation via Gemini 3 Pro Image API
+        const body: Record<string, unknown> = {
+          prompt: generateData.prompt,
+          aspectRatio: imageSettings.aspectRatio,
+          resolution: imageSettings.resolution, // '1K', '2K', or '4K'
+          numberOfImages: imageSettings.count,
+          userId: user.id, // Pass userId for Supabase storage upload
         }
-      } else if (mediaType === 'music') {
-        if (generateData.duration) {
-          input.seconds_total = generateData.duration
+
+        // Add reference image for image-to-image or edit modes
+        if (generateData.image && (subMode === 'image-to-image' || subMode === 'edit')) {
+          let imageData: string
+          if (typeof generateData.image === 'string') {
+            // If it's a data URL, extract base64
+            if (generateData.image.startsWith('data:')) {
+              imageData = generateData.image.split(',')[1]
+            } else {
+              imageData = generateData.image
+            }
+          } else {
+            imageData = await fileToBase64(generateData.image)
+          }
+          body.referenceImages = [imageData]
         }
-      }
 
-      // Add optional assets
-      if (generateData.image) {
-        input.image_url = generateData.image
-      }
-      if (generateData.video_url) {
-        input.video_url = generateData.video_url
-      }
-      if (generateData.audio_url) {
-        input.audio_url = generateData.audio_url
-      }
-      if (generateData.reference_audio_url) {
-        input.reference_audio_url = generateData.reference_audio_url
-      }
-      if (generateData.voice && endpointId === 'fal-ai/playht/tts/v3') {
-        input.voice = generateData.voice
-        input.input = generateData.prompt
-      }
-      if (generateData.advanced_camera_control) {
-        input.advanced_camera_control = generateData.advanced_camera_control
-      }
+        // Call API first, then create database record on success
+        console.log('[useGeneration] Calling image API with body:', JSON.stringify(body, null, 2))
 
-      // Handle F5-TTS special case
-      if (endpointId === 'fal-ai/f5-tts') {
-        input.gen_text = generateData.prompt
+        // Make API call FIRST
+        const response = await fetch('/api/ai/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          console.error('[useGeneration] API error:', error)
+          throw new Error(error.error || 'Image generation failed')
+        }
+
+        const result = await response.json()
+        console.log('[useGeneration] API result:', result)
+
+        // Extract image URLs from result
+        const images = result.images as Array<{ url: string; mimeType: string }>
+        const resultUrls = images.map((img) => img.url)
+
+        // Create a local generation object for immediate display
+        const localGeneration: AIGeneration = {
+          id: `local-${Date.now()}`,
+          user_id: user.id,
+          project_id: null,
+          type: mediaType,
+          prompt: generateData.prompt,
+          negative_prompt: null,
+          model: 'Gemini 3 Pro',
+          endpoint_id: endpoint.id,
+          request_id: null,
+          parameters: {
+            subMode,
+            aspectRatio: imageSettings.aspectRatio,
+            resolution: imageSettings.resolution,
+            count: imageSettings.count,
+          },
+          result_url: resultUrls[0],
+          result_data: { images, urls: resultUrls },
+          status: 'completed',
+          error_message: null,
+          cost_credits: 2 * imageSettings.count,
+          created_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        }
+
+        // Set latest result for immediate display
+        setLatestResult(localGeneration)
+        console.log('[useGeneration] Set latest result for display:', resultUrls[0])
+
+        // Try to save to database (but don't block on it)
+        let generation = localGeneration
+        try {
+          const dbGeneration = await addToDb({
+            type: mediaType,
+            prompt: generateData.prompt,
+            negative_prompt: null,
+            model: 'Gemini 3 Pro',
+            endpoint_id: endpoint.id,
+            request_id: null,
+            parameters: {
+              subMode,
+              aspectRatio: imageSettings.aspectRatio,
+              resolution: imageSettings.resolution,
+              count: imageSettings.count,
+            },
+            result_url: resultUrls[0],
+            result_data: { images, urls: resultUrls },
+            status: 'completed',
+            error_message: null,
+            cost_credits: 2 * imageSettings.count,
+            project_id: null,
+          })
+          generation = dbGeneration
+          console.log('[useGeneration] Database record created:', dbGeneration.id)
+          // Clear local result since DB has it now
+          setLatestResult(null)
+        } catch (dbError) {
+          console.error('[useGeneration] Database error (image still displays):', dbError)
+          // Keep latestResult so image still shows
+        }
+
+        resetGenerateData()
+        return generation
+      } else {
+        // Video generation via Veo 3.1 API (async with polling)
+        const body: Record<string, unknown> = {
+          prompt: generateData.prompt,
+          aspectRatio: videoSettings.aspectRatio,
+          duration: videoSettings.duration,
+          resolution: videoSettings.resolution,
+          userId: user.id, // Pass userId for Supabase storage upload
+        }
+
+        // Add image for image-to-video mode
+        if (generateData.image && subMode === 'image-to-video') {
+          let imageData: string
+          if (typeof generateData.image === 'string') {
+            if (generateData.image.startsWith('data:')) {
+              imageData = generateData.image.split(',')[1]
+            } else {
+              imageData = generateData.image
+            }
+          } else {
+            imageData = await fileToBase64(generateData.image)
+          }
+          body.image = imageData
+        }
+
+        // Make API call to start video generation
+        const response = await fetch('/api/ai/video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Video generation failed')
+        }
+
+        const result = await response.json()
+
+        // Create generation record with operation ID in parameters for polling
+        const generation = await addToDb({
+          type: mediaType,
+          prompt: generateData.prompt,
+          negative_prompt: null,
+          model: 'Veo',
+          endpoint_id: endpoint.id,
+          request_id: result.operationId, // Store operation ID in request_id
+          parameters: {
+            subMode,
+            aspectRatio: videoSettings.aspectRatio,
+            duration: videoSettings.duration,
+            resolution: videoSettings.resolution,
+            operationId: result.operationId, // Also store in parameters for easy access
+          },
+          result_url: null,
+          result_data: null,
+          status: 'pending',
+          error_message: null,
+          cost_credits: 10,
+          project_id: null,
+        })
+
+        resetGenerateData()
+        return generation
       }
-
-      // Map input keys if needed
-      const mappedInput = endpoint.inputMap
-        ? mapInputKey(input, endpoint.inputMap)
-        : input
-
-      // Determine actual endpoint (handle image-to-video)
-      let actualEndpoint = endpointId
-      if (generateData.image && mediaType === 'video') {
-        actualEndpoint = `${endpointId}/image-to-video`
-      }
-
-      // Submit to queue
-      const result = await fal.queue.submit(actualEndpoint, {
-        input: mappedInput,
-      })
-
-      // Create generation record in database
-      const generation = await addToDb({
-        type: mediaType,
-        prompt: generateData.prompt,
-        negative_prompt: null,
-        model: endpoint.label,
-        endpoint_id: actualEndpoint,
-        request_id: result.request_id,
-        parameters: mappedInput,
-        result_url: null,
-        result_data: null,
-        status: 'pending',
-        error_message: null,
-        cost_credits: mediaType === 'video' ? 10 : mediaType === 'music' ? 5 : 2,
-        project_id: null,
-      })
-
-      resetGenerateData()
-
-      return generation
     } catch (error) {
       console.error('Generation error:', error)
       throw error
@@ -247,67 +352,101 @@ export function useGeneration() {
     }
   }, [
     endpoint,
-    endpointId,
     mediaType,
+    subMode,
     generateData,
+    imageSettings,
+    videoSettings,
     user,
     addToDb,
+    updateInDb,
     resetGenerateData,
   ])
 
-  const getEndpointsForCategory = useCallback((category: MediaCategory) => {
-    return AVAILABLE_ENDPOINTS.filter((e) => e.category === category)
-  }, [])
+  // Combine database generations with latest local result
+  const allGenerations = latestResult
+    ? [latestResult, ...generations.filter(g => g.id !== latestResult.id)]
+    : generations
+
+  // Updated helper that includes latestResult
+  const getCompletedGenerationsWithLocal = useCallback(
+    (type?: MediaCategory) => {
+      const all = latestResult
+        ? [latestResult, ...generations.filter(g => g.id !== latestResult.id)]
+        : generations
+      return all.filter((g) => g.status === 'completed' && (!type || g.type === type))
+    },
+    [generations, latestResult]
+  )
 
   return {
     // State
     mediaType,
-    endpointId,
+    subMode,
     endpoint,
     generateData,
-    generations,
+    imageSettings,
+    videoSettings,
+    generations: allGenerations,
     isGenerating,
     generationsLoading,
 
     // Actions
-    setMediaType: handleSetMediaType,
-    setEndpointId: handleSetEndpointId,
+    setMediaType,
+    setSubMode,
     setGenerateData,
+    setImageSettings,
+    setVideoSettings,
     resetGenerateData,
     generate,
     removeGeneration: deleteFromDb,
 
     // Helpers
-    getEndpointsForCategory,
-    getCompletedGenerations,
+    getCompletedGenerations: getCompletedGenerationsWithLocal,
     getPendingGenerations,
   }
 }
 
 // Helper to get output URL from generation result
 export function getGenerationOutputUrl(generation: AIGeneration): string | null {
+  // First check direct result_url
   if (generation.result_url) return generation.result_url
 
   if (!generation.result_data) return null
 
   const output = generation.result_data
 
-  // Handle different output formats
+  // Check for urls array in result_data
+  if (output.urls && Array.isArray(output.urls) && output.urls.length > 0) {
+    return output.urls[0] as string
+  }
+
+  // Handle image response (can have url or data format)
   if (output.images && Array.isArray(output.images)) {
-    return (output.images[0] as { url: string })?.url || null
+    const firstImage = output.images[0] as { url?: string; data?: string; mimeType?: string }
+    if (firstImage.url) {
+      return firstImage.url
+    }
+    if (firstImage.data && firstImage.mimeType) {
+      return `data:${firstImage.mimeType};base64,${firstImage.data}`
+    }
   }
-  if (output.video && typeof output.video === 'object') {
-    return (output.video as { url: string })?.url || null
-  }
-  if (output.audio && typeof output.audio === 'object') {
-    return (output.audio as { url: string })?.url || null
-  }
-  if (output.audio_url) {
-    return output.audio_url as string
-  }
-  if (output.url) {
-    return output.url as string
+
+  // Handle video response
+  if (output.videoUrl) {
+    return output.videoUrl as string
   }
 
   return null
+}
+
+// Helper to get all output URLs from generation result
+export function getGenerationOutputUrls(generation: AIGeneration): string[] {
+  // Check for urls stored in result_data
+  if (generation.result_data && generation.result_data.urls && Array.isArray(generation.result_data.urls)) {
+    return generation.result_data.urls as string[]
+  }
+
+  const url = getGenerationOutputUrl(generation)
+  return url ? [url] : []
 }

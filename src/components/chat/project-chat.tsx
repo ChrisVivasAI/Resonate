@@ -22,6 +22,7 @@ interface ProjectChatProps {
   projectName: string
   className?: string
   defaultOpen?: boolean
+  onActionConfirmed?: () => void
 }
 
 export function ProjectChat({
@@ -29,11 +30,13 @@ export function ProjectChat({
   projectName,
   className,
   defaultOpen = false,
+  onActionConfirmed,
 }: ProjectChatProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const [showHistory, setShowHistory] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [confirmingAction, setConfirmingAction] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const { conversations, isLoading: loadingConversations } = useProjectConversations(projectId)
   const {
@@ -59,13 +62,24 @@ export function ProjectChat({
 
   const handleConfirmAction = useCallback(async (actionId: string, approved: boolean) => {
     setConfirmingAction(actionId)
-    await confirmAction(
+    setSuccessMessage(null)
+
+    const result = await confirmAction(
       messages.find(m => m.pending_action?.some(a => a.tool_call.id === actionId))?.id || '',
       actionId,
       approved
     )
+
     setConfirmingAction(null)
-  }, [confirmAction, messages])
+
+    if (result.success && approved) {
+      setSuccessMessage('Changes applied successfully!')
+      // Call the callback to refresh project data
+      onActionConfirmed?.()
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000)
+    }
+  }, [confirmAction, messages, onActionConfirmed])
 
   const handleSelectConversation = useCallback((conv: Conversation) => {
     switchConversation(conv.id)
@@ -267,6 +281,16 @@ export function ProjectChat({
       {error && (
         <div className="px-4 py-2 bg-red-500/10 border-t border-red-500/30">
           <p className="text-xs text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="px-4 py-2 bg-emerald-500/10 border-t border-emerald-500/30">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <p className="text-xs text-emerald-400 font-medium">{successMessage}</p>
+          </div>
         </div>
       )}
 

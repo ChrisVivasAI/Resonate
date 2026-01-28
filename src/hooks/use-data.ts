@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { MediaCategory } from '@/lib/ai/fal'
+import type { MediaCategory } from '@/lib/ai/gemini-media'
 
 // Types
 export interface Client {
@@ -588,10 +588,10 @@ export interface AIGeneration {
   negative_prompt: string | null
   model: string
   endpoint_id: string | null
-  request_id: string | null
+  request_id: string | null  // Used for async video generation (stores operationId)
   parameters: Record<string, unknown>
   result_url: string | null
-  result_data: Record<string, unknown> | null
+  result_data: Record<string, unknown> | null  // URLs stored in result_data.urls
   status: 'pending' | 'running' | 'completed' | 'failed'
   error_message: string | null
   cost_credits: number

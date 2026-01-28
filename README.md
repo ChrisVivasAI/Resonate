@@ -1,15 +1,15 @@
 # Resonate - Creative Agency Platform
 
-A modern, AI-powered creative agency management platform built with Next.js, Supabase, Stripe, and FAL.ai.
+A modern, AI-powered creative agency management platform built with Next.js, Supabase, Stripe, and Google Gemini AI.
 
 ![Resonate](https://via.placeholder.com/1200x600/1a2337/ed741c?text=Resonate+Creative+Agency)
 
 ## Features
 
 ### 🎨 AI Creative Suite
-- **Image Generation**: Generate stunning visuals using FLUX models via FAL.ai
+- **Image Generation**: Generate stunning visuals using Gemini 3 Pro Image
 - **Text Generation**: Create compelling copy with Gemini AI
-- **Video Generation**: Transform images into videos
+- **Video Generation**: Create videos with Veo 3.1
 - **Image Tools**: Upscale, remove backgrounds, enhance faces
 
 ### 📊 Project Management
@@ -40,7 +40,8 @@ A modern, AI-powered creative agency management platform built with Next.js, Sup
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
 - **Payments**: Stripe
-- **AI - Images**: FAL.ai (FLUX models)
+- **AI - Images**: Google Gemini 3 Pro Image
+- **AI - Video**: Google Veo 3.1
 - **AI - Text**: Google Gemini
 - **Styling**: Tailwind CSS
 - **Animations**: Framer Motion
@@ -55,7 +56,6 @@ A modern, AI-powered creative agency management platform built with Next.js, Sup
 - npm or yarn
 - Supabase account
 - Stripe account
-- FAL.ai API key
 - Google Gemini API key
 
 ### Installation
@@ -88,10 +88,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# FAL.ai
-FAL_KEY=your_fal_api_key
-
-# Gemini
+# Google Gemini API (for AI image/video generation)
 GEMINI_API_KEY=your_gemini_api_key
 
 # App
@@ -182,10 +179,19 @@ Make sure to set all environment variables in your Vercel project settings.
 POST /api/ai/image
 {
   "prompt": "A modern logo...",
-  "negative_prompt": "blurry, low quality",
-  "model": "fal-ai/flux/dev",
-  "image_size": "landscape_4_3",
-  "num_images": 1
+  "aspectRatio": "16:9",
+  "numberOfImages": 1
+}
+```
+
+#### Generate Video
+```
+POST /api/ai/video
+{
+  "prompt": "A cinematic scene...",
+  "aspectRatio": "16:9",
+  "duration": 4,
+  "resolution": "720p"
 }
 ```
 

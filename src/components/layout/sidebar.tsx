@@ -90,7 +90,10 @@ export function Sidebar() {
       {/* Content */}
       <div className="relative flex flex-col h-full">
         {/* Logo */}
-        <div className="h-20 flex items-center justify-between px-5">
+        <div className={cn(
+          "h-20 flex items-center",
+          isCollapsed ? "justify-center px-3" : "justify-between px-5"
+        )}>
           <Link href="/dashboard" className="flex items-center gap-3 group">
             <motion.div
               whileHover={{ scale: 1.02 }}
@@ -104,7 +107,7 @@ export function Sidebar() {
                     alt="RESONATE"
                     width={28}
                     height={28}
-                    className="w-7 h-7"
+                    className="w-7 h-7 object-contain"
                   />
                 </div>
               ) : (
@@ -121,19 +124,31 @@ export function Sidebar() {
             </motion.div>
           </Link>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-lg text-charcoal-500 hover:text-white hover:bg-white/[0.04] transition-all duration-300"
-          >
-            {isCollapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
+          {!isCollapsed && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-2 rounded-lg text-charcoal-500 hover:text-white hover:bg-white/[0.04] transition-all duration-300"
+            >
               <ChevronLeft className="w-4 h-4" />
-            )}
-          </motion.button>
+            </motion.button>
+          )}
         </div>
+
+        {/* Expand button when collapsed - positioned at bottom of logo area */}
+        {isCollapsed && (
+          <div className="flex justify-center -mt-2 mb-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsCollapsed(false)}
+              className="p-1.5 rounded-md text-charcoal-500 hover:text-white hover:bg-white/[0.04] transition-all duration-300"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </motion.button>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="mx-5 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
@@ -163,7 +178,8 @@ export function Sidebar() {
                         }
                       }}
                       className={cn(
-                        'relative w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300 group',
+                        'relative w-full flex items-center gap-3 py-3 rounded-lg transition-all duration-300 group',
+                        isCollapsed ? 'justify-center px-0' : 'px-3',
                         isActive
                           ? 'text-white'
                           : 'text-charcoal-500 hover:text-charcoal-200'
@@ -291,7 +307,8 @@ export function Sidebar() {
                   <Link
                     href={item.href}
                     className={cn(
-                      'relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300 group',
+                      'relative flex items-center gap-3 py-3 rounded-lg transition-all duration-300 group',
+                      isCollapsed ? 'justify-center px-0' : 'px-3',
                       isActive
                         ? 'text-white'
                         : 'text-charcoal-500 hover:text-charcoal-200'
@@ -414,7 +431,8 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'relative flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300',
+                  'relative flex items-center gap-3 py-3 rounded-lg transition-all duration-300',
+                  isCollapsed ? 'justify-center px-0' : 'px-3',
                   isActive
                     ? 'bg-white/[0.04] text-white'
                     : 'text-charcoal-500 hover:bg-white/[0.02] hover:text-charcoal-300'
@@ -443,7 +461,8 @@ export function Sidebar() {
             onClick={handleSignOut}
             disabled={isSigningOut}
             className={cn(
-              "w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300",
+              "w-full flex items-center gap-3 py-3 rounded-lg transition-all duration-300",
+              isCollapsed ? "justify-center px-0" : "px-3",
               isSigningOut
                 ? "text-charcoal-600 cursor-not-allowed"
                 : "text-charcoal-500 hover:bg-red-500/5 hover:text-red-400"

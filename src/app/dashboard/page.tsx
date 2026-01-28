@@ -8,12 +8,9 @@ import {
   FolderKanban,
   Users,
   CheckCircle2,
-  ArrowUpRight,
-  Sparkles,
   Clock,
   Plus,
   ArrowRight,
-  Zap,
   Target,
   Loader2,
 } from 'lucide-react'
@@ -22,12 +19,6 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Avatar, Button } from 
 import { formatCurrency, formatRelativeTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useDashboardStats, useAuth } from '@/hooks'
-
-const aiActivity = [
-  { id: '1', type: 'image', prompt: 'Modern logo with abstract shapes', time: '2 hours ago', credits: 2 },
-  { id: '2', type: 'text', prompt: 'Product description for wellness app', time: '4 hours ago', credits: 1 },
-  { id: '3', type: 'image', prompt: 'Hero banner for e-commerce site', time: '1 day ago', credits: 2 },
-]
 
 export default function DashboardPage() {
   const { profile, loading: authLoading } = useAuth()
@@ -336,71 +327,6 @@ export default function DashboardPage() {
               </div>
             </motion.div>
 
-            {/* AI Activity */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-            >
-              <div className="relative bg-white/[0.02] backdrop-blur-sm rounded-lg border border-resonate-400/20 overflow-hidden">
-                {/* Subtle glow effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-resonate-400/[0.03] to-transparent pointer-events-none" />
-
-                <div className="relative flex items-center justify-between p-4 border-b border-resonate-400/10">
-                  <div className="flex items-center gap-2.5">
-                    <div className="relative p-1.5 rounded-md bg-resonate-400/10">
-                      <Sparkles className="w-3.5 h-3.5 text-resonate-400" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-medium text-white tracking-wide">AI Studio</span>
-                      <p className="text-[9px] text-charcoal-500 uppercase tracking-[0.1em]">Recent activity</p>
-                    </div>
-                  </div>
-                  <Link href="/ai-studio" className="text-[10px] text-resonate-400 hover:text-resonate-300 transition-colors uppercase tracking-[0.1em]">
-                    Open
-                  </Link>
-                </div>
-
-                <div className="relative p-3 space-y-2">
-                  {aiActivity.map((activity, index) => (
-                    <motion.div
-                      key={activity.id}
-                      initial={{ opacity: 0, scale: 0.98 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3, delay: 0.7 + index * 0.08 }}
-                      className="p-3 rounded-md bg-white/[0.02] hover:bg-white/[0.04] transition-colors cursor-pointer group border border-transparent hover:border-white/[0.06]"
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className={`text-[9px] uppercase tracking-[0.1em] ${
-                          activity.type === 'image' ? 'text-resonate-400' : 'text-charcoal-400'
-                        }`}>
-                          {activity.type}
-                        </span>
-                        <div className="flex items-center gap-1 text-[9px] text-charcoal-600">
-                          <Zap className="w-2.5 h-2.5" />
-                          <span>{activity.credits}</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-charcoal-400 group-hover:text-charcoal-200 transition-colors line-clamp-1">
-                        {activity.prompt}
-                      </p>
-                      <p className="text-[9px] text-charcoal-600 mt-1">{activity.time}</p>
-                    </motion.div>
-                  ))}
-
-                  <Link href="/ai-studio" className="block mt-3">
-                    <motion.button
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-resonate-400/10 hover:bg-resonate-400/20 border border-resonate-400/20 rounded-md text-resonate-400 text-xs tracking-wide transition-all duration-300"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Open AI Studio
-                    </motion.button>
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
           </div>
         </div>
       </div>

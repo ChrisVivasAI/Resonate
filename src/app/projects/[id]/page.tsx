@@ -1045,7 +1045,15 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Project AI Chat */}
-      <ProjectChat projectId={projectId} projectName={project.name} />
+      <ProjectChat
+        projectId={projectId}
+        projectName={project.name}
+        onActionConfirmed={() => {
+          // Refresh all project data when AI makes changes
+          refetch()
+          refetchDeliverables()
+        }}
+      />
 
       {/* Task Modal */}
       <Modal
