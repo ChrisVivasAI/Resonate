@@ -20,8 +20,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks'
 import { useClientNavigation } from '@/hooks/use-client-navigation'
 import { ClientSubNav } from './client-sub-nav'
 
@@ -44,9 +44,7 @@ export function Sidebar() {
   const [isClientsExpanded, setIsClientsExpanded] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const { activeClients, loading: clientsLoading } = useClientNavigation()
-
-  // Create supabase client once
-  const supabase = useMemo(() => createClient(), [])
+  const { signOut } = useAuth()
 
   // Auto-expand clients section if on a client-related route
   useEffect(() => {
@@ -60,12 +58,7 @@ export function Sidebar() {
 
     setIsSigningOut(true)
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.error('Sign out error:', error)
-        setIsSigningOut(false)
-        return
-      }
+      await signOut()
       // Force a hard navigation to clear all state
       window.location.href = '/auth/login'
     } catch (error) {

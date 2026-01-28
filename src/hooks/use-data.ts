@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState, useCallback } from 'react'
+import { useAuth } from './use-auth'
 import type { MediaCategory } from '@/lib/ai/gemini-media'
 
 // Types
@@ -62,12 +62,10 @@ export interface Payment {
 
 // Hook for fetching clients
 export function useClients() {
+  const { supabase, loading: authLoading } = useAuth()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Create supabase client once
-  const supabase = useMemo(() => createClient(), [])
 
   const fetchClients = useCallback(async () => {
     try {
@@ -118,9 +116,12 @@ export function useClients() {
     }
   }, [supabase])
 
+  // Wait for auth to be ready before fetching
   useEffect(() => {
-    fetchClients()
-  }, [fetchClients])
+    if (!authLoading) {
+      fetchClients()
+    }
+  }, [authLoading, fetchClients])
 
   const addClient = async (client: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'totalSpent' | 'projectsCount'>) => {
     const { data, error } = await supabase
@@ -158,12 +159,10 @@ export function useClients() {
 
 // Hook for fetching projects with optional clientId filter
 export function useProjects(clientId?: string) {
+  const { supabase, loading: authLoading } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Create supabase client once
-  const supabase = useMemo(() => createClient(), [])
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -194,11 +193,14 @@ export function useProjects(clientId?: string) {
     } finally {
       setLoading(false)
     }
-  }, [clientId])
+  }, [supabase, clientId])
 
+  // Wait for auth to be ready before fetching
   useEffect(() => {
-    fetchProjects()
-  }, [fetchProjects])
+    if (!authLoading) {
+      fetchProjects()
+    }
+  }, [authLoading, fetchProjects])
 
   const addProject = async (project: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'client'>) => {
     const { data, error } = await supabase
@@ -236,14 +238,12 @@ export function useProjects(clientId?: string) {
 
 // Hook for fetching a single project
 export function useProject(projectId: string | null) {
+  const { supabase, loading: authLoading } = useAuth()
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [milestones, setMilestones] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Create supabase client once
-  const supabase = useMemo(() => createClient(), [])
 
   const fetchProject = useCallback(async () => {
     if (!projectId) {
@@ -293,11 +293,14 @@ export function useProject(projectId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [supabase, projectId])
 
+  // Wait for auth to be ready before fetching
   useEffect(() => {
-    fetchProject()
-  }, [fetchProject])
+    if (!authLoading) {
+      fetchProject()
+    }
+  }, [authLoading, fetchProject])
 
   const updateProject = async (updates: Partial<Project>) => {
     if (!projectId) return null
@@ -451,12 +454,10 @@ export function useProject(projectId: string | null) {
 
 // Hook for fetching payments with optional clientId filter
 export function usePayments(clientId?: string) {
+  const { supabase, loading: authLoading } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Create supabase client once
-  const supabase = useMemo(() => createClient(), [])
 
   const fetchPayments = useCallback(async () => {
     try {
@@ -488,17 +489,21 @@ export function usePayments(clientId?: string) {
     } finally {
       setLoading(false)
     }
-  }, [clientId])
+  }, [supabase, clientId])
 
+  // Wait for auth to be ready before fetching
   useEffect(() => {
-    fetchPayments()
-  }, [fetchPayments])
+    if (!authLoading) {
+      fetchPayments()
+    }
+  }, [authLoading, fetchPayments])
 
   return { payments, loading, error, refetch: fetchPayments }
 }
 
 // Hook for dashboard stats
 export function useDashboardStats() {
+  const { supabase, loading: authLoading } = useAuth()
   const [stats, setStats] = useState({
     totalRevenue: 0,
     activeProjects: 0,
@@ -510,10 +515,10 @@ export function useDashboardStats() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Create supabase client once
-  const supabase = useMemo(() => createClient(), [])
-
   useEffect(() => {
+    // Wait for auth to be ready
+    if (authLoading || !supabase) return
+
     let isMounted = true
 
     const fetchStats = async () => {
@@ -573,7 +578,7 @@ export function useDashboardStats() {
     return () => {
       isMounted = false
     }
-  }, [supabase])
+  }, [supabase, authLoading])
 
   return { stats, recentProjects, recentPayments, loading, error }
 }
@@ -601,12 +606,10 @@ export interface AIGeneration {
 
 // Hook for AI Generations
 export function useGenerations(userId?: string) {
+  const { supabase, loading: authLoading } = useAuth()
   const [generations, setGenerations] = useState<AIGeneration[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // Create supabase client once
-  const supabase = useMemo(() => createClient(), [])
 
   const fetchGenerations = useCallback(async () => {
     if (!userId) {
@@ -635,15 +638,18 @@ export function useGenerations(userId?: string) {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [supabase, userId])
 
+  // Wait for auth to be ready before fetching
   useEffect(() => {
-    fetchGenerations()
-  }, [fetchGenerations])
+    if (!authLoading) {
+      fetchGenerations()
+    }
+  }, [authLoading, fetchGenerations])
 
   // Subscribe to realtime updates
   useEffect(() => {
-    if (!userId) return
+    if (!userId || authLoading) return
 
     const channel = supabase
       .channel('ai_generations_changes')
@@ -676,20 +682,47 @@ export function useGenerations(userId?: string) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId])
+  }, [supabase, userId, authLoading])
 
   const addGeneration = async (
     generation: Omit<AIGeneration, 'id' | 'created_at' | 'completed_at' | 'user_id'>
   ) => {
-    if (!userId) throw new Error('User not authenticated')
+    if (!userId) {
+      console.error('[addGeneration] No userId available - user not authenticated')
+      throw new Error('User not authenticated')
+    }
+
+    // Debug: Check current auth session
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    console.log('[addGeneration] Current session:', sessionData?.session?.user?.id, 'userId param:', userId)
+    if (sessionError) {
+      console.error('[addGeneration] Session error:', sessionError)
+    }
+    if (!sessionData?.session) {
+      console.error('[addGeneration] No active session - user may need to re-login')
+    }
+
+    const insertData = { ...generation, user_id: userId }
+    console.log('[addGeneration] Attempting insert with userId:', userId)
+    console.log('[addGeneration] Insert data keys:', Object.keys(insertData))
 
     const { data, error } = await supabase
       .from('ai_generations')
-      .insert({ ...generation, user_id: userId })
+      .insert(insertData)
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[addGeneration] Supabase insert error:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
+      throw error
+    }
+
+    console.log('[addGeneration] Successfully inserted:', data.id)
     return data as AIGeneration
   }
 

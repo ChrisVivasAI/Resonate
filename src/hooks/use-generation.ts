@@ -55,6 +55,7 @@ export function useGeneration() {
     deleteGeneration: deleteFromDb,
     getPendingGenerations,
     getCompletedGenerations,
+    refetch: refetchGenerations,
   } = useGenerations(user?.id)
 
   // Mode state
@@ -215,9 +216,12 @@ export function useGeneration() {
         const images = result.images as Array<{ url: string; mimeType: string }>
         const resultUrls = images.map((img) => img.url)
 
+        // Check if server already created the database record
+        const serverGenerationId = result.generationId as string | null
+
         // Create a local generation object for immediate display
         const localGeneration: AIGeneration = {
-          id: `local-${Date.now()}`,
+          id: serverGenerationId || `local-${Date.now()}`,
           user_id: user.id,
           project_id: null,
           type: mediaType,
@@ -245,36 +249,46 @@ export function useGeneration() {
         setLatestResult(localGeneration)
         console.log('[useGeneration] Set latest result for display:', resultUrls[0])
 
-        // Try to save to database (but don't block on it)
+        // If server created the record, just refetch to get it in history
+        // Otherwise, try to save to database from client
         let generation = localGeneration
-        try {
-          const dbGeneration = await addToDb({
-            type: mediaType,
-            prompt: generateData.prompt,
-            negative_prompt: null,
-            model: 'Gemini 3 Pro',
-            endpoint_id: endpoint.id,
-            request_id: null,
-            parameters: {
-              subMode,
-              aspectRatio: imageSettings.aspectRatio,
-              resolution: imageSettings.resolution,
-              count: imageSettings.count,
-            },
-            result_url: resultUrls[0],
-            result_data: { images, urls: resultUrls },
-            status: 'completed',
-            error_message: null,
-            cost_credits: 2 * imageSettings.count,
-            project_id: null,
-          })
-          generation = dbGeneration
-          console.log('[useGeneration] Database record created:', dbGeneration.id)
+        if (serverGenerationId) {
+          console.log('[useGeneration] Server created generation record:', serverGenerationId)
+          // Refetch to get the server-created record in our local state
+          await refetchGenerations()
           // Clear local result since DB has it now
           setLatestResult(null)
-        } catch (dbError) {
-          console.error('[useGeneration] Database error (image still displays):', dbError)
-          // Keep latestResult so image still shows
+        } else {
+          // Fallback: try to save to database from client
+          try {
+            const dbGeneration = await addToDb({
+              type: mediaType,
+              prompt: generateData.prompt,
+              negative_prompt: null,
+              model: 'Gemini 3 Pro',
+              endpoint_id: endpoint.id,
+              request_id: null,
+              parameters: {
+                subMode,
+                aspectRatio: imageSettings.aspectRatio,
+                resolution: imageSettings.resolution,
+                count: imageSettings.count,
+              },
+              result_url: resultUrls[0],
+              result_data: { images, urls: resultUrls },
+              status: 'completed',
+              error_message: null,
+              cost_credits: 2 * imageSettings.count,
+              project_id: null,
+            })
+            generation = dbGeneration
+            console.log('[useGeneration] Client-side database record created:', dbGeneration.id)
+            await refetchGenerations()
+            setLatestResult(null)
+          } catch (dbError) {
+            console.error('[useGeneration] Database error (image still displays):', dbError)
+            // Keep latestResult so image still shows
+          }
         }
 
         resetGenerateData()
@@ -361,6 +375,7 @@ export function useGeneration() {
     addToDb,
     updateInDb,
     resetGenerateData,
+    refetchGenerations,
   ])
 
   // Combine database generations with latest local result

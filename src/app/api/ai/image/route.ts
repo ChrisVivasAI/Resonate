@@ -231,8 +231,48 @@ export async function POST(request: NextRequest) {
 
     console.log('Successfully generated', generatedImages.length, 'images')
 
+    // Save generation record to database (server-side to avoid RLS issues)
+    let generationId: string | null = null
+    if (userId) {
+      try {
+        const supabase = getSupabaseAdmin()
+        const resultUrls = generatedImages.map(img => img.url)
+
+        const { data: genRecord, error: genError } = await supabase
+          .from('ai_generations')
+          .insert({
+            user_id: userId,
+            type: 'image',
+            prompt: prompt,
+            model: 'Gemini 3 Pro',
+            endpoint_id: GEMINI_MEDIA_MODELS.IMAGE,
+            parameters: {
+              aspectRatio: aspectRatio || null,
+              resolution: resolution || null,
+              numberOfImages: numberOfImages || 1,
+            },
+            result_url: resultUrls[0],
+            result_data: { images: generatedImages, urls: resultUrls },
+            status: 'completed',
+            cost_credits: 2 * (numberOfImages || 1),
+          })
+          .select('id')
+          .single()
+
+        if (genError) {
+          console.error('[API] Failed to save generation record:', genError.message, genError.code)
+        } else {
+          generationId = genRecord.id
+          console.log('[API] Generation record saved:', generationId)
+        }
+      } catch (dbError) {
+        console.error('[API] Database error saving generation:', dbError)
+        // Don't fail the request - image was still generated successfully
+      }
+    }
+
     const result: ImageGenerationResult = { images: generatedImages }
-    return NextResponse.json(result)
+    return NextResponse.json({ ...result, generationId })
   } catch (error) {
     console.error('=== Image Generation Error ===')
     console.error('Error:', error)
