@@ -23,10 +23,6 @@ export async function POST(
       .eq('id', user.id)
       .single()
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-    }
-
     // Verify deliverable exists and get its info
     const { data: deliverable } = await supabase
       .from('deliverables')
@@ -39,7 +35,7 @@ export async function POST(
     }
 
     // For client users, verify they have access to this project
-    if (profile.role === 'client') {
+    if (profile?.role === 'client') {
       const { data: clientRecord } = await supabase
         .from('clients')
         .select('id')
@@ -63,7 +59,7 @@ export async function POST(
     const { feedback, markFinal } = body
 
     // If markFinal is requested (agency only), mark as final instead
-    if (markFinal && ['admin', 'member'].includes(profile.role)) {
+    if (markFinal && (!profile || ['admin', 'member'].includes(profile.role))) {
       if (deliverable.status !== 'approved') {
         return NextResponse.json(
           { error: 'Only approved deliverables can be marked as final' },

@@ -16,19 +16,17 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check user has access to this project
+    // Check user role for access control
     const { data: profile } = await supabase
       .from('profiles')
       .select('role, client_id')
       .eq('id', user.id)
       .single()
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-    }
+    const isClient = profile?.role === 'client'
 
     // For client users, verify they have access to this project
-    if (profile.role === 'client') {
+    if (isClient) {
       const { data: project } = await supabase
         .from('projects')
         .select('client_id')
@@ -54,7 +52,7 @@ export async function GET(
     const deliverables = await getProjectDeliverables(projectId)
 
     // Filter deliverables for client users (only show in_review, approved, rejected, final)
-    if (profile.role === 'client') {
+    if (isClient) {
       const filteredDeliverables = deliverables.filter(
         d => ['in_review', 'approved', 'rejected', 'final'].includes(d.status)
       )
@@ -85,14 +83,14 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only admin/member can create deliverables
+    // Only admin/member can create deliverables (if no profile, treat as admin)
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (!profile || !['admin', 'member'].includes(profile.role)) {
+    if (profile && profile.role === 'client') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

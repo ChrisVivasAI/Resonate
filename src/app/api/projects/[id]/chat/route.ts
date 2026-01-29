@@ -209,6 +209,118 @@ async function buildProjectContext(supabase: ReturnType<typeof createClient> ext
 }
 
 // =====================================================
+// HELPER: FORMAT TOOL RESULTS AS READABLE MESSAGE
+// =====================================================
+
+function formatToolResultsMessage(executedResults: { call_id: string; result: unknown; error?: string }[], toolCalls: { id: string; name: string; args: Record<string, unknown> }[]): string {
+  const parts: string[] = []
+
+  for (const result of executedResults) {
+    const toolCall = toolCalls.find(tc => tc.id === result.call_id)
+    const name = toolCall?.name || 'unknown'
+    const data = result.result as Record<string, unknown> | null
+
+    if (result.error) {
+      parts.push(`I encountered an error: ${result.error}`)
+      continue
+    }
+
+    if (!data) continue
+
+    switch (name) {
+      case 'suggest_next_steps': {
+        const steps = data.next_steps as string[] | undefined
+        const priorityTask = data.priority_task as { title: string; status: string; priority: string } | null
+        const nextMilestone = data.next_milestone as { title: string; due_date?: string } | null
+        const lines: string[] = []
+        if (steps && steps.length > 0) {
+          lines.push('**Suggested Next Steps:**')
+          steps.forEach(s => lines.push(`- ${s}`))
+        }
+        if (priorityTask) {
+          lines.push(`\n**Priority Task:** ${priorityTask.title} (${priorityTask.status}, ${priorityTask.priority} priority)`)
+        }
+        if (nextMilestone) {
+          lines.push(`**Next Milestone:** ${nextMilestone.title}${nextMilestone.due_date ? ` — due ${nextMilestone.due_date}` : ''}`)
+        }
+        parts.push(lines.join('\n'))
+        break
+      }
+
+      case 'get_project_summary': {
+        const tasks = data.tasks as { total: number; completed: number; overdue: number } | undefined
+        const milestones = data.milestones as { total: number; completed: number } | undefined
+        const budget = data.budget as { total: number; spent: number; remaining: number } | undefined
+        const lines: string[] = [`**Project Summary: ${data.project_name || 'Current Project'}**`]
+        lines.push(`- **Status:** ${data.status} — **Progress:** ${data.progress}%`)
+        if (tasks) lines.push(`- **Tasks:** ${tasks.completed}/${tasks.total} completed${tasks.overdue > 0 ? ` (${tasks.overdue} overdue)` : ''}`)
+        if (milestones) lines.push(`- **Milestones:** ${milestones.completed}/${milestones.total} completed`)
+        if (budget) lines.push(`- **Budget:** $${budget.spent.toLocaleString()} spent of $${budget.total.toLocaleString()} ($${budget.remaining.toLocaleString()} remaining)`)
+        parts.push(lines.join('\n'))
+        break
+      }
+
+      case 'get_overdue_items': {
+        const overdueTasks = data.overdue_tasks as Array<{ title: string; due_date: string }> | undefined
+        const overdueMilestones = data.overdue_milestones as Array<{ title: string; due_date: string }> | undefined
+        const total = data.total_overdue as number
+        if (total === 0) {
+          parts.push('No overdue items found. Everything is on track!')
+        } else {
+          const lines: string[] = [`**${total} Overdue Item${total !== 1 ? 's' : ''}:**`]
+          overdueTasks?.forEach(t => lines.push(`- **Task:** ${t.title} (due ${t.due_date})`))
+          overdueMilestones?.forEach(m => lines.push(`- **Milestone:** ${m.title} (due ${m.due_date})`))
+          parts.push(lines.join('\n'))
+        }
+        break
+      }
+
+      case 'get_financial_summary': {
+        const lines: string[] = ['**Financial Summary:**']
+        lines.push(`- **Budget:** $${(data.budget as number || 0).toLocaleString()}`)
+        lines.push(`- **Total Spent:** $${(data.total_spent as number || 0).toLocaleString()} (${data.budget_utilization || 'N/A'})`)
+        lines.push(`- **Expenses:** $${(data.total_expenses as number || 0).toLocaleString()}`)
+        lines.push(`- **Labor:** $${(data.total_labor as number || 0).toLocaleString()}`)
+        lines.push(`- **Remaining:** $${(data.remaining_budget as number || 0).toLocaleString()}`)
+        if ((data.pending_reimbursements as number) > 0) lines.push(`- **Pending Reimbursements:** $${(data.pending_reimbursements as number).toLocaleString()}`)
+        if ((data.pending_returns as number) > 0) lines.push(`- **Pending Returns:** $${(data.pending_returns as number).toLocaleString()}`)
+        parts.push(lines.join('\n'))
+        break
+      }
+
+      case 'analyze_project_health': {
+        const score = data.health_score as number
+        const status = data.status as string
+        const issues = data.issues as string[]
+        const recommendations = data.recommendations as string[]
+        const lines: string[] = [`**Project Health: ${score}/100** (${status})`]
+        if (issues && issues.length > 0) {
+          lines.push('\n**Issues:**')
+          issues.forEach(i => lines.push(`- ${i}`))
+        }
+        if (recommendations && recommendations.length > 0) {
+          lines.push('\n**Recommendations:**')
+          recommendations.forEach(r => lines.push(`- ${r}`))
+        }
+        parts.push(lines.join('\n'))
+        break
+      }
+
+      default: {
+        // For mutation tools (create_task, update_task, etc.), use the message field
+        const msg = (data as Record<string, unknown>).message as string | undefined
+        if (msg) {
+          parts.push(msg)
+        }
+        break
+      }
+    }
+  }
+
+  return parts.length > 0 ? parts.join('\n\n') : ''
+}
+
+// =====================================================
 // POST: SEND MESSAGE TO AGENT
 // =====================================================
 
@@ -286,11 +398,20 @@ export async function POST(
           tool_calls: msg.tool_calls as ToolCall[] | undefined,
         }
       } else if (msg.role === 'tool') {
+        // Gemini functionResponse requires:
+        //   name: the function name (not the call ID)
+        //   response: a parsed object (not a JSON string)
+        let parsedResult: unknown = {}
+        try {
+          parsedResult = msg.content ? JSON.parse(msg.content) : {}
+        } catch {
+          parsedResult = { raw: msg.content }
+        }
         return {
           role: 'tool' as const,
           tool_results: [{
-            call_id: msg.tool_call_id || '',
-            result: msg.content,
+            call_id: msg.tool_name || msg.tool_call_id || '',
+            result: parsedResult,
           }],
         }
       }
@@ -335,6 +456,13 @@ export async function POST(
       }
     }
 
+    // Build assistant message content:
+    // Use Gemini's text if available, otherwise format tool results as readable text
+    const assistantContent = response.message
+      || (executedResults.length > 0
+        ? formatToolResultsMessage(executedResults, response.tool_calls)
+        : null)
+
     // Save assistant message
     const { data: assistantMsg, error: assistantMsgError } = await supabase
       .from('project_messages')
@@ -342,7 +470,7 @@ export async function POST(
         conversation_id: conversationId,
         project_id: projectId,
         role: 'assistant',
-        content: response.message,
+        content: assistantContent,
         tool_calls: response.tool_calls.length > 0 ? response.tool_calls : null,
         pending_action: pendingActions.length > 0 ? pendingActions : null,
         tokens_used: response.tokens_used,
@@ -389,7 +517,7 @@ export async function POST(
       message: {
         id: assistantMsg?.id,
         role: 'assistant',
-        content: response.message,
+        content: assistantContent,
         tool_calls: response.tool_calls,
         pending_actions: pendingActions,
         tokens_used: response.tokens_used,

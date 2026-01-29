@@ -14,31 +14,31 @@ import { Button, IconButton } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ChatMessage } from './chat-message'
 import { ChatInput } from './chat-input'
-import { useProjectChat, useProjectConversations } from '@/hooks/use-project-chat'
-import type { Conversation } from '@/hooks/use-project-chat'
+import { useLeadChat, useLeadConversations } from '@/hooks/use-lead-chat'
+import type { LeadConversation } from '@/hooks/use-lead-chat'
 
-interface ProjectChatProps {
-  projectId: string
-  projectName: string
+interface LeadChatProps {
+  leadId: string
+  leadName: string
   className?: string
   defaultOpen?: boolean
   onActionConfirmed?: () => void
 }
 
-export function ProjectChat({
-  projectId,
-  projectName,
+export function LeadChat({
+  leadId,
+  leadName,
   className,
   defaultOpen = false,
   onActionConfirmed,
-}: ProjectChatProps) {
+}: LeadChatProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const [showHistory, setShowHistory] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [confirmingAction, setConfirmingAction] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const { conversations, isLoading: loadingConversations } = useProjectConversations(projectId)
+  const { conversations, isLoading: loadingConversations } = useLeadConversations(leadId)
   const {
     messages,
     isLoading,
@@ -49,7 +49,7 @@ export function ProjectChat({
     confirmAction,
     startNewConversation,
     switchConversation,
-  } = useProjectChat(projectId)
+  } = useLeadChat(leadId)
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -74,14 +74,12 @@ export function ProjectChat({
 
     if (result.success && approved) {
       setSuccessMessage('Changes applied successfully!')
-      // Call the callback to refresh project data
       onActionConfirmed?.()
-      // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000)
     }
   }, [confirmAction, messages, onActionConfirmed])
 
-  const handleSelectConversation = useCallback((conv: Conversation) => {
+  const handleSelectConversation = useCallback((conv: LeadConversation) => {
     switchConversation(conv.id)
     setShowHistory(false)
   }, [switchConversation])
@@ -91,12 +89,13 @@ export function ProjectChat({
     setShowHistory(false)
   }, [startNewConversation])
 
-  // Quick actions
+  // Quick actions for leads
   const quickActions = [
-    { label: 'Project summary', prompt: 'Give me a summary of this project' },
-    { label: 'Overdue items', prompt: 'What items are overdue?' },
-    { label: 'Next steps', prompt: 'What should we work on next?' },
-    { label: 'Budget status', prompt: 'What is the current budget status?' },
+    { label: 'Qualify this lead', prompt: 'Qualify this lead using the BANT framework' },
+    { label: 'Draft a response', prompt: 'Draft a professional email response to this lead' },
+    { label: 'Suggest next steps', prompt: 'Suggest the best next steps for this lead' },
+    { label: 'Analyze intent', prompt: 'Analyze this lead\'s intent and urgency' },
+    { label: 'Generate follow-up', prompt: 'Generate a personalized follow-up email' },
   ]
 
   if (!isOpen) {
@@ -129,9 +128,9 @@ export function ProjectChat({
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h3 className="font-medium text-white text-sm">Project Assistant</h3>
+            <h3 className="font-medium text-white text-sm">Lead Assistant</h3>
             <p className="text-xs text-obsidian-400 truncate max-w-[200px]">
-              {projectName}
+              {leadName}
             </p>
           </div>
         </div>
@@ -223,10 +222,10 @@ export function ProjectChat({
               <Sparkles className="w-8 h-8 text-ember-400" />
             </div>
             <h4 className="font-medium text-white mb-2">
-              How can I help with {projectName}?
+              How can I help with this lead?
             </h4>
             <p className="text-sm text-obsidian-400 mb-6">
-              I can help you manage tasks, track progress, analyze project health, and more.
+              I can qualify leads, draft responses, analyze intent, and manage lead details.
             </p>
 
             {/* Quick Actions */}
@@ -260,7 +259,7 @@ export function ProjectChat({
                 isConfirming={confirmingAction === msg.pending_action?.[0]?.tool_call.id}
               />
             ))}
-            {isLoading && (
+            {isSending && (
               <div className="flex items-center gap-3 px-4 py-3">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-obsidian-700 to-obsidian-800 border border-obsidian-600 flex items-center justify-center">
                   <Bot className="w-4 h-4 text-ember-400 animate-pulse" />
@@ -295,7 +294,7 @@ export function ProjectChat({
       )}
 
       {/* Input */}
-      <ChatInput onSend={handleSend} isLoading={isSending} />
+      <ChatInput onSend={handleSend} isLoading={isSending} placeholder="Ask about this lead..." />
     </Card>
   )
 }

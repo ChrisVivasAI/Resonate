@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import {
   Search,
@@ -14,13 +15,14 @@ import {
   Inbox,
   ArrowUpRight,
   Clock,
+  Plus,
 } from 'lucide-react'
 import { DashboardLayout, Header } from '@/components/layout'
-import { Card, Button, Input, Badge, Avatar } from '@/components/ui'
+import { Card, Button, Input, Badge, Avatar, Modal, Textarea, Select } from '@/components/ui'
 import { formatRelativeTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useLeads } from '@/hooks/use-leads'
-import type { LeadStatus, LeadPriority } from '@/types'
+import type { LeadStatus, LeadPriority, LeadSource } from '@/types'
 
 const statusColors: Record<LeadStatus, string> = {
   new: 'bg-blue-500/20 text-blue-400',
@@ -46,12 +48,32 @@ const statusLabels: Record<LeadStatus, string> = {
   lost: 'Lost',
 }
 
+const sourceOptions: { value: LeadSource; label: string }[] = [
+  { value: 'website', label: 'Website' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'social', label: 'Social Media' },
+  { value: 'event', label: 'Event' },
+  { value: 'other', label: 'Other' },
+]
+
 export default function LeadsPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('')
   const [showFilters, setShowFilters] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    subject: '',
+    message: '',
+    source: 'website' as LeadSource,
+  })
 
-  const { leads, isLoading, error } = useLeads({
+  const { leads, isLoading, error, createLead } = useLeads({
     status: statusFilter || undefined,
     search: searchQuery || undefined,
   })
@@ -62,6 +84,29 @@ export default function LeadsPage() {
       lead.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       lead.email.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const handleCreateLead = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) return
+
+    setIsCreating(true)
+    const lead = await createLead({
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      message: formData.message.trim(),
+      phone: formData.phone.trim() || undefined,
+      company: formData.company.trim() || undefined,
+      subject: formData.subject.trim() || undefined,
+      source: formData.source,
+    })
+    setIsCreating(false)
+
+    if (lead) {
+      setShowAddModal(false)
+      setFormData({ name: '', email: '', phone: '', company: '', subject: '', message: '', source: 'website' })
+      router.push(`/leads/${lead.id}`)
+    }
+  }
 
   // Stats
   const stats = {
@@ -89,6 +134,15 @@ export default function LeadsPage() {
       <Header
         title="Leads"
         description="Manage incoming inquiries and convert them into clients."
+        actions={
+          <Button
+            variant="primary"
+            leftIcon={<Plus className="w-4 h-4" />}
+            onClick={() => setShowAddModal(true)}
+          >
+            Add New Lead
+          </Button>
+        }
       />
 
       <div className="p-8">
@@ -253,6 +307,87 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
+
+      {/* Add New Lead Modal */}
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Add New Lead"
+        description="Manually enter a new lead's information."
+        size="lg"
+      >
+        <form onSubmit={handleCreateLead} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Name *"
+              placeholder="Full name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              required
+            />
+            <Input
+              label="Email *"
+              type="email"
+              placeholder="email@example.com"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              required
+            />
+            <Input
+              label="Phone"
+              placeholder="Phone number"
+              value={formData.phone}
+              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+            />
+            <Input
+              label="Company"
+              placeholder="Company name"
+              value={formData.company}
+              onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+            />
+          </div>
+
+          <Input
+            label="Subject"
+            placeholder="What are they interested in?"
+            value={formData.subject}
+            onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+          />
+
+          <Select
+            label="Source"
+            options={sourceOptions}
+            value={formData.source}
+            onChange={(e) => setFormData(prev => ({ ...prev, source: e.target.value as LeadSource }))}
+          />
+
+          <Textarea
+            label="Message *"
+            placeholder="Describe the lead's inquiry or how they reached out..."
+            value={formData.message}
+            onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+            required
+          />
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowAddModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isCreating || !formData.name.trim() || !formData.email.trim() || !formData.message.trim()}
+              isLoading={isCreating}
+            >
+              Add Lead
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </DashboardLayout>
   )
 }

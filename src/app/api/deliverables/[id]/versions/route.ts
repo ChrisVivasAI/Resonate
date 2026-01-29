@@ -42,14 +42,14 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only admin/member can create versions
+    // Only admin/member can create versions (if no profile, treat as admin)
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (!profile || !['admin', 'member'].includes(profile.role)) {
+    if (profile && profile.role === 'client') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

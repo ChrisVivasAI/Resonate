@@ -16,18 +16,16 @@ import {
   Video,
   FileText,
   Send,
-  Clock,
   Tag,
   User,
   ChevronDown,
-  Copy,
-  Check,
 } from 'lucide-react'
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, Button, Badge, Avatar, Input } from '@/components/ui'
 import { formatDate, formatRelativeTime, getStatusColor, getPriorityColor } from '@/lib/utils'
 import Link from 'next/link'
 import { useLead } from '@/hooks/use-leads'
+import { LeadChat } from '@/components/chat/lead-chat'
 import type { LeadStatus, LeadPriority, LeadActivityType } from '@/types'
 
 const statusOptions: { value: LeadStatus; label: string }[] = [
@@ -45,14 +43,6 @@ const priorityOptions: { value: LeadPriority; label: string }[] = [
   { value: 'high', label: 'High' },
 ]
 
-const aiActions = [
-  { id: 'draft_response', label: 'Draft Email Response', icon: Mail },
-  { id: 'suggest_next_steps', label: 'Suggest Next Steps', icon: FileText },
-  { id: 'analyze_intent', label: 'Analyze Intent', icon: Sparkles },
-  { id: 'qualify_lead', label: 'Qualify Lead', icon: Tag },
-  { id: 'follow_up_reminder', label: 'Generate Follow-Up', icon: Clock },
-]
-
 const activityIcons: Record<LeadActivityType, typeof MessageSquare> = {
   note: FileText,
   email: Mail,
@@ -67,16 +57,11 @@ export default function LeadDetailPage() {
   const router = useRouter()
   const leadId = params.id as string
 
-  const { lead, activities, isLoading, error, updateLead, addActivity, aiAssist, refetch } = useLead(leadId)
+  const { lead, activities, isLoading, error, updateLead, addActivity, refetch } = useLead(leadId)
 
   const [isUpdating, setIsUpdating] = useState(false)
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false)
-  const [showAiPanel, setShowAiPanel] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiResponse, setAiResponse] = useState('')
-  const [selectedAiAction, setSelectedAiAction] = useState('')
-  const [copied, setCopied] = useState(false)
 
   // Activity form state
   const [activityType, setActivityType] = useState<LeadActivityType>('note')
@@ -106,24 +91,6 @@ export default function LeadDetailPage() {
     setActivityContent('')
     setActivityType('note')
     setIsAddingActivity(false)
-  }
-
-  const handleAiAssist = async (action: string) => {
-    setSelectedAiAction(action)
-    setAiLoading(true)
-    setAiResponse('')
-
-    const result = await aiAssist(action)
-    if (result) {
-      setAiResponse(result.response)
-    }
-    setAiLoading(false)
-  }
-
-  const copyToClipboard = async () => {
-    await navigator.clipboard.writeText(aiResponse)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   if (isLoading) {
@@ -159,13 +126,6 @@ export default function LeadDetailPage() {
         description={lead.company || lead.email}
         actions={
           <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              leftIcon={<Sparkles className="w-4 h-4" />}
-              onClick={() => setShowAiPanel(!showAiPanel)}
-            >
-              AI Assist
-            </Button>
             <Link href="/leads">
               <Button variant="ghost" leftIcon={<ArrowLeft className="w-4 h-4" />}>
                 Back
@@ -388,78 +348,6 @@ export default function LeadDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* AI Assist Panel */}
-            <AnimatePresence>
-              {showAiPanel && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                >
-                  <Card className="border-white/20">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Sparkles className="w-5 h-5 text-white" />
-                      <h3 className="text-lg font-semibold text-white">AI Assistant</h3>
-                    </div>
-
-                    <div className="space-y-2 mb-4">
-                      {aiActions.map((action) => (
-                        <button
-                          key={action.id}
-                          onClick={() => handleAiAssist(action.id)}
-                          disabled={aiLoading}
-                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                            selectedAiAction === action.id
-                              ? 'bg-white/10 text-white'
-                              : 'text-charcoal-300 hover:bg-white/5 hover:text-white'
-                          }`}
-                        >
-                          <action.icon className="w-4 h-4" />
-                          <span className="text-sm">{action.label}</span>
-                          {aiLoading && selectedAiAction === action.id && (
-                            <Loader2 className="w-4 h-4 animate-spin ml-auto" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    {aiResponse && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-charcoal-900 rounded-lg p-4"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-charcoal-500 uppercase tracking-wider">
-                            AI Response
-                          </span>
-                          <button
-                            onClick={copyToClipboard}
-                            className="flex items-center gap-1 text-xs text-charcoal-400 hover:text-white"
-                          >
-                            {copied ? (
-                              <>
-                                <Check className="w-3 h-3" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" />
-                                Copy
-                              </>
-                            )}
-                          </button>
-                        </div>
-                        <p className="text-sm text-charcoal-300 whitespace-pre-wrap max-h-64 overflow-y-auto">
-                          {aiResponse}
-                        </p>
-                      </motion.div>
-                    )}
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             {/* Quick Info */}
             <Card>
               <h3 className="text-lg font-semibold text-white mb-4">Quick Info</h3>
@@ -548,6 +436,13 @@ export default function LeadDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating AI Chat Assistant */}
+      <LeadChat
+        leadId={leadId}
+        leadName={lead.name}
+        onActionConfirmed={refetch}
+      />
     </DashboardLayout>
   )
 }

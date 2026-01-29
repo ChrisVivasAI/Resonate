@@ -1,13 +1,23 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { Bot, User, Wrench, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
-import type { ChatMessage as ChatMessageType } from '@/hooks/use-project-chat'
+import { Bot, User, AlertTriangle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import type { PendingAction } from '@/lib/ai/project-agent'
 import { Button } from '@/components/ui/button'
 
+// Generic message interface that works for both project and lead messages
+interface GenericChatMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system' | 'tool'
+  content: string | null
+  pending_action: PendingAction[] | null
+  action_confirmed: boolean | null
+  created_at: string
+}
+
 interface ChatMessageProps {
-  message: ChatMessageType
+  message: GenericChatMessage
   onConfirmAction?: (actionId: string, approved: boolean) => void
   isConfirming?: boolean
 }
@@ -15,47 +25,12 @@ interface ChatMessageProps {
 export function ChatMessage({ message, onConfirmAction, isConfirming }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
-  const isTool = message.role === 'tool'
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
     })
-  }
-
-  // Parse tool result for display
-  const parseToolResult = (content: string | null) => {
-    if (!content) return null
-    try {
-      const parsed = JSON.parse(content)
-      if (parsed.success) {
-        return { success: true, message: parsed.message || 'Action completed' }
-      }
-      return { success: false, message: parsed.error || 'Action failed' }
-    } catch {
-      return { success: true, message: content }
-    }
-  }
-
-  if (isTool) {
-    const result = parseToolResult(message.content)
-    return (
-      <div className="flex items-start gap-3 px-4 py-2">
-        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-obsidian-700 flex items-center justify-center">
-          <Wrench className="w-3 h-3 text-obsidian-400" />
-        </div>
-        <div className="flex items-center gap-2 text-sm text-obsidian-400">
-          {result?.success ? (
-            <CheckCircle className="w-4 h-4 text-emerald-500" />
-          ) : (
-            <XCircle className="w-4 h-4 text-red-500" />
-          )}
-          <span className="text-obsidian-300">{message.tool_name}:</span>
-          <span>{result?.message}</span>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -96,23 +71,10 @@ export function ChatMessage({ message, onConfirmAction, isConfirming }: ChatMess
               : 'glass text-obsidian-100 rounded-bl-md'
           )}
         >
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        </div>
-
-        {/* Tool calls display */}
-        {isAssistant && message.tool_calls && message.tool_calls.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-1">
-            {message.tool_calls.map((tc) => (
-              <div
-                key={tc.id}
-                className="flex items-center gap-1.5 text-xs text-obsidian-400 bg-obsidian-800/50 rounded-full px-2.5 py-1"
-              >
-                <Wrench className="w-3 h-3" />
-                <span>{tc.name.replace(/_/g, ' ')}</span>
-              </div>
-            ))}
+          <div className="text-sm prose prose-invert prose-sm max-w-none">
+            <ReactMarkdown>{message.content || ''}</ReactMarkdown>
           </div>
-        )}
+        </div>
 
         {/* Pending actions */}
         {isAssistant && message.pending_action && message.pending_action.length > 0 && !message.action_confirmed && (
