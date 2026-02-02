@@ -16,13 +16,15 @@ import {
   ArrowUpRight,
   Clock,
   Plus,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, Button, Input, Badge, Avatar, Modal, Textarea, Select } from '@/components/ui'
 import { formatRelativeTime } from '@/lib/utils'
 import Link from 'next/link'
 import { useLeads } from '@/hooks/use-leads'
-import type { LeadStatus, LeadPriority, LeadSource } from '@/types'
+import type { Lead, LeadStatus, LeadPriority, LeadSource } from '@/types'
 
 const statusColors: Record<LeadStatus, string> = {
   new: 'bg-blue-500/20 text-blue-400',
@@ -73,7 +75,23 @@ export default function LeadsPage() {
     source: 'website' as LeadSource,
   })
 
-  const { leads, isLoading, error, createLead } = useLeads({
+  // Edit/Delete lead state for card actions
+  const [editingLead, setEditingLead] = useState<Lead | null>(null)
+  const [showEditLeadModal, setShowEditLeadModal] = useState(false)
+  const [showDeleteLeadModal, setShowDeleteLeadModal] = useState(false)
+  const [editLeadLoading, setEditLeadLoading] = useState(false)
+  const [deleteLeadLoading, setDeleteLeadLoading] = useState(false)
+  const [editLeadForm, setEditLeadForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    subject: '',
+    source: 'website' as LeadSource,
+    message: '',
+  })
+
+  const { leads, isLoading, error, createLead, updateLead, deleteLead } = useLeads({
     status: statusFilter || undefined,
     search: searchQuery || undefined,
   })
@@ -105,6 +123,60 @@ export default function LeadsPage() {
       setShowAddModal(false)
       setFormData({ name: '', email: '', phone: '', company: '', subject: '', message: '', source: 'website' })
       router.push(`/leads/${lead.id}`)
+    }
+  }
+
+  const openEditLead = (lead: Lead) => {
+    setEditingLead(lead)
+    setEditLeadForm({
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone || '',
+      company: lead.company || '',
+      subject: lead.subject || '',
+      source: lead.source,
+      message: lead.message,
+    })
+    setShowEditLeadModal(true)
+  }
+
+  const handleSaveEditLead = async () => {
+    if (!editingLead || !editLeadForm.name.trim() || !editLeadForm.email.trim()) return
+    setEditLeadLoading(true)
+    try {
+      await updateLead(editingLead.id, {
+        name: editLeadForm.name,
+        email: editLeadForm.email,
+        phone: editLeadForm.phone || undefined,
+        company: editLeadForm.company || undefined,
+        subject: editLeadForm.subject || undefined,
+        message: editLeadForm.message || undefined,
+      })
+      setShowEditLeadModal(false)
+      setEditingLead(null)
+    } catch (err) {
+      console.error('Error saving lead:', err)
+    } finally {
+      setEditLeadLoading(false)
+    }
+  }
+
+  const openDeleteLead = (lead: Lead) => {
+    setEditingLead(lead)
+    setShowDeleteLeadModal(true)
+  }
+
+  const handleDeleteLead = async () => {
+    if (!editingLead) return
+    setDeleteLeadLoading(true)
+    try {
+      await deleteLead(editingLead.id)
+      setShowDeleteLeadModal(false)
+      setEditingLead(null)
+    } catch (err) {
+      console.error('Error deleting lead:', err)
+    } finally {
+      setDeleteLeadLoading(false)
     }
   }
 
@@ -294,10 +366,26 @@ export default function LeadsPage() {
                         )}
                       </div>
 
-                      {/* Time */}
+                      {/* Time & Actions */}
                       <div className="flex items-center gap-2 text-sm text-charcoal-500 md:ml-4">
                         <Calendar className="w-4 h-4" />
                         <span>{formatRelativeTime(lead.created_at)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 md:ml-2">
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditLead(lead) }}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                          title="Edit lead"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openDeleteLead(lead) }}
+                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
+                          title="Delete lead"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </Card>
@@ -387,6 +475,104 @@ export default function LeadsPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Edit Lead Modal */}
+      <Modal
+        isOpen={showEditLeadModal}
+        onClose={() => { setShowEditLeadModal(false); setEditingLead(null) }}
+        title="Edit Lead"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Name"
+              value={editLeadForm.name}
+              onChange={(e) => setEditLeadForm({ ...editLeadForm, name: e.target.value })}
+              placeholder="Full name"
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={editLeadForm.email}
+              onChange={(e) => setEditLeadForm({ ...editLeadForm, email: e.target.value })}
+              placeholder="email@example.com"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Phone"
+              value={editLeadForm.phone}
+              onChange={(e) => setEditLeadForm({ ...editLeadForm, phone: e.target.value })}
+              placeholder="Phone number"
+            />
+            <Input
+              label="Company"
+              value={editLeadForm.company}
+              onChange={(e) => setEditLeadForm({ ...editLeadForm, company: e.target.value })}
+              placeholder="Company name"
+            />
+          </div>
+          <Input
+            label="Subject"
+            value={editLeadForm.subject}
+            onChange={(e) => setEditLeadForm({ ...editLeadForm, subject: e.target.value })}
+            placeholder="What are they interested in?"
+          />
+          <Select
+            label="Source"
+            value={editLeadForm.source}
+            onChange={(e) => setEditLeadForm({ ...editLeadForm, source: e.target.value as LeadSource })}
+            options={sourceOptions}
+          />
+          <Textarea
+            label="Message"
+            value={editLeadForm.message}
+            onChange={(e) => setEditLeadForm({ ...editLeadForm, message: e.target.value })}
+            placeholder="Lead's message"
+            rows={4}
+          />
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" onClick={() => { setShowEditLeadModal(false); setEditingLead(null) }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEditLead}
+              disabled={editLeadLoading || !editLeadForm.name.trim() || !editLeadForm.email.trim()}
+              leftIcon={editLeadLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
+            >
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Lead Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteLeadModal}
+        onClose={() => { setShowDeleteLeadModal(false); setEditingLead(null) }}
+        title="Delete Lead"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-white/60">
+            Are you sure you want to delete <span className="text-white font-medium">{editingLead?.name}</span>? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => { setShowDeleteLeadModal(false); setEditingLead(null) }}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteLead}
+              disabled={deleteLeadLoading}
+              leftIcon={deleteLeadLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            >
+              Delete Lead
+            </Button>
+          </div>
+        </div>
       </Modal>
     </DashboardLayout>
   )

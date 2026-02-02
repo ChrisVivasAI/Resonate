@@ -32,8 +32,8 @@ import {
 } from 'lucide-react'
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, Button, Badge, Avatar, Progress, Modal, Input, Textarea, Select } from '@/components/ui'
-import type { Task, Milestone, Deliverable } from '@/types'
-import { useProject, useProjectHealth, useActivity, useDeliverables } from '@/hooks'
+import type { Task, Milestone, Deliverable, Project } from '@/types'
+import { useProject, useProjectHealth, useActivity, useDeliverables, useClients } from '@/hooks'
 import { Image as ImageIcon, Video, Music, FileText as FileTextIcon, Code } from 'lucide-react'
 import { HealthReport, MonitoringConfig } from '@/components/ai'
 import { ActivityFeed } from '@/components/collaboration/activity-feed'
@@ -112,6 +112,24 @@ export default function ProjectDetailPage() {
   const [deliverableLoading, setDeliverableLoading] = useState(false)
   const [deletingDeliverableId, setDeletingDeliverableId] = useState<string | null>(null)
 
+  // Project edit/delete state
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false)
+  const [showDeleteProjectModal, setShowDeleteProjectModal] = useState(false)
+  const [showProjectMenu, setShowProjectMenu] = useState(false)
+  const [projectFormLoading, setProjectFormLoading] = useState(false)
+  const [deleteProjectLoading, setDeleteProjectLoading] = useState(false)
+  const [projectForm, setProjectForm] = useState({
+    name: '',
+    description: '',
+    client_id: '' as string | null,
+    status: 'draft' as Project['status'],
+    priority: 'medium' as Project['priority'],
+    budget: '',
+    start_date: '',
+    due_date: '',
+    tags: '',
+  })
+
   const {
     project,
     tasks,
@@ -119,6 +137,8 @@ export default function ProjectDetailPage() {
     loading,
     error,
     refetch,
+    updateProject,
+    deleteProject,
     addTask,
     updateTask,
     deleteTask,
@@ -126,6 +146,8 @@ export default function ProjectDetailPage() {
     updateMilestone,
     deleteMilestone,
   } = useProject(projectId)
+
+  const { clients } = useClients()
 
   const {
     deliverables,
@@ -157,6 +179,59 @@ export default function ProjectDetailPage() {
       console.error('Error generating plan:', err)
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  // Project edit/delete handlers
+  const openEditProject = () => {
+    if (!project) return
+    setProjectForm({
+      name: project.name,
+      description: project.description || '',
+      client_id: project.client_id,
+      status: project.status,
+      priority: project.priority,
+      budget: project.budget?.toString() || '',
+      start_date: project.start_date?.split('T')[0] || '',
+      due_date: project.due_date?.split('T')[0] || '',
+      tags: project.tags?.join(', ') || '',
+    })
+    setShowEditProjectModal(true)
+    setShowProjectMenu(false)
+  }
+
+  const handleSaveProject = async () => {
+    if (!projectForm.name.trim()) return
+    setProjectFormLoading(true)
+    try {
+      await updateProject({
+        name: projectForm.name,
+        description: projectForm.description || null,
+        client_id: projectForm.client_id || null,
+        status: projectForm.status,
+        priority: projectForm.priority,
+        budget: projectForm.budget ? parseFloat(projectForm.budget) : 0,
+        start_date: projectForm.start_date || null,
+        due_date: projectForm.due_date || null,
+        tags: projectForm.tags ? projectForm.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      })
+      setShowEditProjectModal(false)
+    } catch (err) {
+      console.error('Error saving project:', err)
+    } finally {
+      setProjectFormLoading(false)
+    }
+  }
+
+  const handleDeleteProject = async () => {
+    setDeleteProjectLoading(true)
+    try {
+      await deleteProject()
+      router.push('/projects')
+    } catch (err) {
+      console.error('Error deleting project:', err)
+    } finally {
+      setDeleteProjectLoading(false)
     }
   }
 
@@ -478,12 +553,42 @@ export default function ProjectDetailPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm">
+              <Button variant="secondary" size="sm" onClick={openEditProject}>
                 <Settings className="w-4 h-4" />
               </Button>
-              <Button variant="secondary" size="sm">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
+              <div className="relative">
+                <Button variant="secondary" size="sm" onClick={() => setShowProjectMenu(!showProjectMenu)}>
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+                <AnimatePresence>
+                  {showProjectMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowProjectMenu(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute right-0 top-full mt-2 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-20 min-w-[180px] overflow-hidden"
+                      >
+                        <button
+                          onClick={openEditProject}
+                          className="w-full px-4 py-2.5 text-left text-sm text-white/70 hover:bg-white/5 flex items-center gap-2"
+                        >
+                          <Pencil className="w-4 h-4" />
+                          Edit Project
+                        </button>
+                        <button
+                          onClick={() => { setShowDeleteProjectModal(true); setShowProjectMenu(false) }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete Project
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </div>
@@ -1270,6 +1375,130 @@ export default function ProjectDetailPage() {
               leftIcon={deliverableLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
             >
               {editingDeliverable ? 'Save Changes' : 'Create Deliverable'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Project Modal */}
+      <Modal
+        isOpen={showEditProjectModal}
+        onClose={() => setShowEditProjectModal(false)}
+        title="Edit Project"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Project Name"
+            value={projectForm.name}
+            onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })}
+            placeholder="Enter project name"
+          />
+          <Textarea
+            label="Description"
+            value={projectForm.description}
+            onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
+            placeholder="Enter project description (optional)"
+            rows={3}
+          />
+          <Select
+            label="Client"
+            value={projectForm.client_id || ''}
+            onChange={(e) => setProjectForm({ ...projectForm, client_id: e.target.value || null })}
+            options={[
+              { value: '', label: 'No Client' },
+              ...clients.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Status"
+              value={projectForm.status}
+              onChange={(e) => setProjectForm({ ...projectForm, status: e.target.value as Project['status'] })}
+              options={[
+                { value: 'draft', label: 'Draft' },
+                { value: 'in_progress', label: 'In Progress' },
+                { value: 'review', label: 'Review' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'cancelled', label: 'Cancelled' },
+              ]}
+            />
+            <Select
+              label="Priority"
+              value={projectForm.priority}
+              onChange={(e) => setProjectForm({ ...projectForm, priority: e.target.value as Project['priority'] })}
+              options={[
+                { value: 'low', label: 'Low' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'high', label: 'High' },
+                { value: 'urgent', label: 'Urgent' },
+              ]}
+            />
+          </div>
+          <Input
+            label="Budget"
+            type="number"
+            value={projectForm.budget}
+            onChange={(e) => setProjectForm({ ...projectForm, budget: e.target.value })}
+            placeholder="0.00"
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Start Date"
+              type="date"
+              value={projectForm.start_date}
+              onChange={(e) => setProjectForm({ ...projectForm, start_date: e.target.value })}
+            />
+            <Input
+              label="Due Date"
+              type="date"
+              value={projectForm.due_date}
+              onChange={(e) => setProjectForm({ ...projectForm, due_date: e.target.value })}
+            />
+          </div>
+          <Input
+            label="Tags"
+            value={projectForm.tags}
+            onChange={(e) => setProjectForm({ ...projectForm, tags: e.target.value })}
+            placeholder="Comma-separated tags (e.g. design, branding)"
+          />
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" onClick={() => setShowEditProjectModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveProject}
+              disabled={projectFormLoading || !projectForm.name.trim()}
+              leftIcon={projectFormLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : undefined}
+            >
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Project Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteProjectModal}
+        onClose={() => setShowDeleteProjectModal(false)}
+        title="Delete Project"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-white/60">
+            Are you sure you want to delete <span className="text-white font-medium">{project.name}</span>? This action cannot be undone. All tasks, milestones, and deliverables associated with this project will also be removed.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setShowDeleteProjectModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteProject}
+              disabled={deleteProjectLoading}
+              leftIcon={deleteProjectLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            >
+              Delete Project
             </Button>
           </div>
         </div>

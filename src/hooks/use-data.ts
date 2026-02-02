@@ -317,6 +317,12 @@ export function useProject(projectId: string | null) {
     return data
   }
 
+  const deleteProject = async () => {
+    if (!projectId) return
+    const { error } = await supabase.from('projects').delete().eq('id', projectId)
+    if (error) throw error
+  }
+
   // Task management
   const addTask = async (task: {
     title: string
@@ -441,6 +447,7 @@ export function useProject(projectId: string | null) {
     error,
     refetch: fetchProject,
     updateProject,
+    deleteProject,
     // Task methods
     addTask,
     updateTask,

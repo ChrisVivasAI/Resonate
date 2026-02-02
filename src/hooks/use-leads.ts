@@ -138,6 +138,7 @@ interface UseLeadReturn {
   refetch: () => Promise<void>
   addActivity: (type: LeadActivity['type'], content: string, metadata?: Record<string, unknown>) => Promise<LeadActivity | null>
   updateLead: (input: UpdateLeadInput) => Promise<Lead | null>
+  deleteLead: () => Promise<boolean>
   aiAssist: (action: string, context?: string) => Promise<{ response: string } | null>
 }
 
@@ -229,6 +230,26 @@ export function useLead(id: string | null): UseLeadReturn {
     }
   }
 
+  const deleteLead = async (): Promise<boolean> => {
+    if (!id) return false
+
+    try {
+      const response = await fetch(`/api/leads/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete lead')
+      }
+
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete lead')
+      return false
+    }
+  }
+
   const aiAssist = async (action: string, context?: string): Promise<{ response: string } | null> => {
     if (!id) return null
 
@@ -262,6 +283,7 @@ export function useLead(id: string | null): UseLeadReturn {
     refetch: fetchLead,
     addActivity,
     updateLead,
+    deleteLead,
     aiAssist,
   }
 }
