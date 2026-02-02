@@ -8,12 +8,11 @@ export default function Artist360Page() {
       heroImage="/images/services/artist360/ARTIST HERO.jpg"
       description="For creators, musicians, and influencers ready to blow past the noise, we craft visuals, content, and narratives that grow your audience, sharpen your image, and put you in the spotlight where you belong."
       bulletPoints={[
-        "Visual Identity & Branding",
-        "Content Strategy & Creation",
-        "Social Media Management",
-        "Music Video Production",
-        "Press Kit & EPK Development",
-        "Merchandise Design"
+        "Photoshoots for press, cover art, or social",
+        "Music visualizers + short-form promo videos",
+        "EPK-ready visuals and assets",
+        "Creative direction + concept development",
+        "Studio or location-based shoots"
       ]}
       featureImage="/images/services/artist-360-feature.jpg"
       workItems={[

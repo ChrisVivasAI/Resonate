@@ -127,11 +127,14 @@ const config: Config = {
         mono: ['var(--font-mono)', 'monospace'],
       },
       fontSize: {
-        'display-2xl': ['4.5rem', { lineHeight: '1', letterSpacing: '-0.02em', fontWeight: '700' }],
-        'display-xl': ['3.75rem', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '700' }],
-        'display-lg': ['3rem', { lineHeight: '1.1', letterSpacing: '-0.01em', fontWeight: '700' }],
-        'display-md': ['2.25rem', { lineHeight: '1.2', letterSpacing: '-0.01em', fontWeight: '700' }],
-        'display-sm': ['1.875rem', { lineHeight: '1.2', letterSpacing: '0', fontWeight: '600' }],
+        'display-2xl': ['4.5rem', { lineHeight: '1', letterSpacing: '0.15em', fontWeight: '700' }],
+        'display-xl': ['3.75rem', { lineHeight: '1.1', letterSpacing: '0.15em', fontWeight: '700' }],
+        'display-lg': ['3rem', { lineHeight: '1.1', letterSpacing: '0.15em', fontWeight: '700' }],
+        'display-md': ['2.25rem', { lineHeight: '1.2', letterSpacing: '0.15em', fontWeight: '700' }],
+        'display-sm': ['1.875rem', { lineHeight: '1.2', letterSpacing: '0.15em', fontWeight: '600' }],
+      },
+      letterSpacing: {
+        'display': '0.15em',
       },
       animation: {
         'fade-in': 'fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1)',

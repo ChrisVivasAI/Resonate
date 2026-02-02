@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Header } from "./header"
@@ -29,6 +29,11 @@ interface ServicePageProps {
   processSteps: ProcessStep[]
 }
 
+// Masonry layout pattern: indices mapped to size classes
+const masonrySizes: ('tall' | 'wide' | 'normal')[] = [
+  'tall', 'normal', 'normal', 'wide', 'normal', 'tall'
+]
+
 export function ServicePageTemplate({
   title,
   tagline,
@@ -50,6 +55,7 @@ export function ServicePageTemplate({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,6 +93,23 @@ export function ServicePageTemplate({
     }
   }
 
+  const openLightbox = useCallback((index: number) => {
+    setLightboxIndex(index)
+  }, [])
+
+  const closeLightbox = useCallback(() => {
+    setLightboxIndex(null)
+  }, [])
+
+  const navigateLightbox = useCallback((direction: 'prev' | 'next') => {
+    setLightboxIndex(prev => {
+      if (prev === null) return null
+      const total = workItems.length
+      if (direction === 'next') return (prev + 1) % total
+      return (prev - 1 + total) % total
+    })
+  }, [workItems.length])
+
   return (
     <main className="min-h-screen bg-[#1a1a1a]">
       <Header />
@@ -102,7 +125,7 @@ export function ServicePageTemplate({
         />
         <div className="absolute inset-0 bg-black/40" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <h1 className="font-display text-7xl md:text-9xl text-white tracking-tight">
+          <h1 className="font-display text-7xl md:text-9xl text-white tracking-display">
             {title}
           </h1>
           <p className="font-display text-2xl md:text-3xl text-white tracking-wider mt-2">
@@ -121,24 +144,24 @@ export function ServicePageTemplate({
       <section className="bg-[#f8f7f4]">
         <div className="flex flex-col lg:flex-row">
           {/* Left Content */}
-          <div className="lg:w-1/2 p-12 lg:p-20">
-            <h2 className="font-display text-5xl md:text-6xl text-neutral-900 mb-6">
+          <div className="lg:w-1/2 p-12 lg:p-20 flex flex-col justify-center">
+            <h2 className="font-display text-6xl md:text-7xl text-neutral-900 mb-8 tracking-display">
               {title}
             </h2>
-            <p className="text-neutral-700 leading-relaxed mb-8 max-w-md">
+            <p className="text-neutral-700 leading-relaxed mb-10 max-w-lg text-lg md:text-xl">
               {description}
             </p>
-            <ul className="space-y-4 mb-10">
+            <ul className="space-y-5 mb-12">
               {bulletPoints.map((point, index) => (
                 <li key={index} className="flex items-start gap-3">
-                  <span className="w-2 h-2 bg-neutral-900 rounded-full mt-2 flex-shrink-0" />
-                  <span className="font-semibold text-neutral-900">{point}</span>
+                  <span className="w-2 h-2 bg-neutral-900 rounded-full mt-2.5 flex-shrink-0" />
+                  <span className="font-semibold text-neutral-900 text-lg">{point}</span>
                 </li>
               ))}
             </ul>
             <Link
               href="#contact"
-              className="inline-block px-8 py-4 bg-neutral-900 text-white font-display text-sm tracking-widest rounded-full hover:bg-neutral-800 transition-colors"
+              className="inline-block px-8 py-4 bg-neutral-900 text-white font-display text-sm tracking-widest rounded-full hover:bg-neutral-800 transition-colors self-start"
             >
               LEARN MORE
             </Link>
@@ -156,43 +179,115 @@ export function ServicePageTemplate({
         </div>
       </section>
 
-      {/* Our Work Section */}
+      {/* Our Work Section — Masonry Gallery */}
       <section className="bg-[#f8f7f4] py-20 px-8 lg:px-20">
-        <h2 className="font-display text-5xl md:text-6xl text-neutral-900 text-center mb-16">
+        <h2 className="font-display text-6xl md:text-7xl text-neutral-900 text-center mb-16 tracking-display">
           OUR WORK
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {workItems.map((item, index) => (
-            <div key={index} className="flex flex-col items-center">
-              {item.image ? (
-                <div className="relative w-full aspect-[4/3] mb-4">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-3 auto-rows-[200px] md:auto-rows-[250px] gap-4">
+          {workItems.map((item, index) => {
+            const size = masonrySizes[index % masonrySizes.length]
+            const spanClass =
+              size === 'tall' ? 'row-span-2' :
+              size === 'wide' ? 'col-span-2' :
+              ''
+
+            return (
+              <div
+                key={index}
+                className={`relative group cursor-pointer overflow-hidden ${spanClass}`}
+                onClick={() => openLightbox(index)}
+              >
+                {item.image ? (
                   <Image
-                    src={item.image || "/placeholder.svg"}
+                    src={item.image}
                     alt={item.name}
                     fill
-                    className="object-cover"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
+                ) : (
+                  <div className="absolute inset-0 bg-neutral-200" />
+                )}
+                {/* Hover overlay with project name */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-300 flex items-end">
+                  <span className="font-display text-white text-lg tracking-wider p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    {item.name}
+                  </span>
                 </div>
-              ) : (
-                <div className="w-full aspect-[4/3] mb-4 bg-neutral-200" />
-              )}
-              <h3 className="font-display text-2xl tracking-wider text-neutral-900">
-                {item.name}
-              </h3>
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       </section>
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          {/* Close button */}
+          <button
+            onClick={closeLightbox}
+            className="absolute top-6 right-6 text-white/70 hover:text-white text-4xl font-light z-10 transition-colors"
+            aria-label="Close lightbox"
+          >
+            &times;
+          </button>
+
+          {/* Previous button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); navigateLightbox('prev') }}
+            className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-5xl font-light z-10 transition-colors"
+            aria-label="Previous image"
+          >
+            &#8249;
+          </button>
+
+          {/* Image */}
+          <div
+            className="relative w-[90vw] h-[80vh] max-w-5xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {workItems[lightboxIndex]?.image ? (
+              <Image
+                src={workItems[lightboxIndex].image!}
+                alt={workItems[lightboxIndex].name}
+                fill
+                className="object-contain"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-neutral-800 flex items-center justify-center">
+                <span className="text-white/50 font-display text-2xl">{workItems[lightboxIndex]?.name}</span>
+              </div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 p-6 text-center">
+              <span className="font-display text-white text-xl tracking-wider">
+                {workItems[lightboxIndex]?.name}
+              </span>
+            </div>
+          </div>
+
+          {/* Next button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); navigateLightbox('next') }}
+            className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white text-5xl font-light z-10 transition-colors"
+            aria-label="Next image"
+          >
+            &#8250;
+          </button>
+        </div>
+      )}
 
       {/* Process Section */}
       <section className="bg-[#2d2d2d] py-20 px-8 lg:px-20">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16">
           {/* Left Side */}
           <div>
-            <h2 className="font-display text-5xl md:text-6xl text-white mb-8">
+            <h2 className="font-display text-6xl md:text-7xl text-white mb-8 tracking-display">
               {processTitle}
             </h2>
-            <p className="text-neutral-400 leading-relaxed">
+            <p className="text-neutral-400 leading-relaxed text-lg md:text-xl">
               {processDescription}
             </p>
           </div>
@@ -201,10 +296,10 @@ export function ServicePageTemplate({
           <div className="space-y-12">
             {processSteps.map((step) => (
               <div key={step.number}>
-                <h3 className="font-display text-3xl md:text-4xl text-white mb-4">
+                <h3 className="font-display text-4xl md:text-5xl text-white mb-4 tracking-display">
                   {step.number} {step.title}
                 </h3>
-                <p className="text-neutral-400 leading-relaxed">
+                <p className="text-neutral-400 leading-relaxed text-base md:text-lg">
                   {step.description}
                 </p>
               </div>
@@ -213,14 +308,19 @@ export function ServicePageTemplate({
         </div>
       </section>
 
-      {/* Contact Form Section */}
-      <section id="contact" className="relative bg-[#f8f7f4] py-20 px-8 lg:px-20 overflow-hidden">
-        {/* Decorative blur elements */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-neutral-300/50 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-neutral-400/30 rounded-full blur-3xl" />
+      {/* Contact Form Section — Dark BG */}
+      <section
+        id="contact"
+        className="relative py-20 px-8 lg:px-20 overflow-hidden bg-cover bg-center bg-fixed"
+        style={{ backgroundImage: "url('/images/contact-bg.jpg')" }}
+      >
+        {/* Dark fallback */}
+        <div className="absolute inset-0 bg-[#1a1a1a]" style={{ zIndex: 0 }} />
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-black/40" style={{ zIndex: 1 }} />
 
-        <div className="relative max-w-4xl mx-auto">
-          <h2 className="font-display text-4xl md:text-5xl text-neutral-900 text-center mb-12">
+        <div className="relative z-10 max-w-4xl mx-auto">
+          <h2 className="font-display text-5xl md:text-6xl text-white text-center mb-12 tracking-display">
             GET IN TOUCH
           </h2>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -230,7 +330,7 @@ export function ServicePageTemplate({
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-6 py-4 bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-400"
+              className="w-full px-6 py-4 bg-white/10 border-0 text-white placeholder:text-white/50 focus:outline-none focus:ring-1 focus:ring-white/30"
             />
             <input
               type="email"
@@ -238,14 +338,14 @@ export function ServicePageTemplate({
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-6 py-4 bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-400"
+              className="w-full px-6 py-4 bg-white/10 border-0 text-white placeholder:text-white/50 focus:outline-none focus:ring-1 focus:ring-white/30"
             />
             <input
               type="text"
               placeholder="Subject"
               value={formData.subject}
               onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-              className="w-full px-6 py-4 bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-400"
+              className="w-full px-6 py-4 bg-white/10 border-0 text-white placeholder:text-white/50 focus:outline-none focus:ring-1 focus:ring-white/30"
             />
             <textarea
               placeholder="Message"
@@ -253,26 +353,26 @@ export function ServicePageTemplate({
               rows={8}
               value={formData.message}
               onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              className="w-full px-6 py-4 bg-white border border-neutral-200 text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:border-neutral-400 resize-y"
+              className="w-full px-6 py-4 bg-white/10 border-0 text-white placeholder:text-white/50 focus:outline-none focus:ring-1 focus:ring-white/30 resize-y"
             />
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-5 bg-[#2d2d2d] text-white font-display text-sm tracking-widest hover:bg-neutral-700 disabled:bg-neutral-400 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-5 bg-white/20 text-white font-display text-sm tracking-widest hover:bg-white/30 disabled:bg-white/10 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? 'SUBMITTING...' : 'SUBMIT'}
             </button>
 
             {submitStatus === 'success' && (
-              <div className="text-center p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-green-700 font-medium">Thank you for reaching out!</p>
-                <p className="text-green-600 text-sm mt-1">We&apos;ll get back to you soon.</p>
+              <div className="text-center p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <p className="text-green-400 font-medium">Thank you for reaching out!</p>
+                <p className="text-green-400/70 text-sm mt-1">We&apos;ll get back to you soon.</p>
               </div>
             )}
 
             {submitStatus === 'error' && (
-              <div className="text-center p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-700">{errorMessage}</p>
+              <div className="text-center p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-red-400">{errorMessage}</p>
               </div>
             )}
           </form>

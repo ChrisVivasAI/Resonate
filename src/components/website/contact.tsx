@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 
 export function Contact() {
   const [formData, setFormData] = useState({
@@ -48,13 +49,18 @@ export function Contact() {
   }
 
   return (
-    <section id="contact" className="relative bg-[#1a1a1a] py-24 px-8 overflow-hidden">
-      {/* Blur effects */}
-      <div className="absolute top-0 right-1/4 w-[600px] h-[600px] rounded-full bg-white/5 blur-[120px] -translate-y-1/2" />
-      <div className="absolute bottom-1/4 left-0 w-[400px] h-[400px] rounded-full bg-white/5 blur-[80px] -translate-x-1/2" />
+    <section
+      id="contact"
+      className="relative py-24 px-8 overflow-hidden bg-cover bg-center bg-fixed"
+      style={{ backgroundImage: "url('/images/contact-bg.jpg')" }}
+    >
+      {/* Dark overlay fallback if image doesn't load */}
+      <div className="absolute inset-0 bg-[#1a1a1a]" style={{ zIndex: 0 }} />
+      {/* Overlay to darken the background image */}
+      <div className="absolute inset-0 bg-black/40" style={{ zIndex: 1 }} />
 
       <div className="relative z-10 max-w-6xl mx-auto">
-        <h2 className="font-display text-4xl text-white text-center mb-16 tracking-tight md:text-5xl">
+        <h2 className="font-display text-4xl text-white text-center mb-16 tracking-display md:text-5xl">
           HAVE AN IDEA ? WORK WITH US
         </h2>
 
@@ -83,9 +89,14 @@ export function Contact() {
             </div>
 
             <div className="pt-4">
-              <span className="font-display text-3xl text-white tracking-wider">
-                RESONATE
-              </span>
+              <div className="relative w-48 h-16">
+                <Image
+                  src="/images/resonate-logo-white.png"
+                  alt="Resonate"
+                  fill
+                  className="object-contain object-left"
+                />
+              </div>
             </div>
           </div>
 
