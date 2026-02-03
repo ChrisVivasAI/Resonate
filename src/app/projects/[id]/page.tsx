@@ -29,15 +29,18 @@ import {
   Trash2,
   X,
   Check,
+  Send,
+  ExternalLink,
+  Ban,
 } from 'lucide-react'
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, Button, Badge, Avatar, Progress, Modal, Input, Textarea, Select } from '@/components/ui'
 import type { Task, Milestone, Deliverable, Project } from '@/types'
-import { useProject, useProjectHealth, useActivity, useDeliverables, useClients } from '@/hooks'
+import { useProject, useProjectHealth, useActivity, useDeliverables, useClients, useInvoices } from '@/hooks'
 import { Image as ImageIcon, Video, Music, FileText as FileTextIcon, Code } from 'lucide-react'
 import { HealthReport, MonitoringConfig } from '@/components/ai'
 import { ActivityFeed } from '@/components/collaboration/activity-feed'
-import { FinancialDashboard } from '@/components/financials'
+import { FinancialDashboard, InvoiceTable } from '@/components/financials'
 import { ExpenseTable } from '@/components/expenses'
 import { LaborTable } from '@/components/labor'
 import { ReimbursementTable } from '@/components/reimbursements'
@@ -473,6 +476,44 @@ export default function ProjectDetailPage() {
       case 'audio': return 'text-orange-400 bg-orange-500/10'
       case 'text': return 'text-violet-400 bg-violet-500/10'
       default: return 'text-emerald-400 bg-emerald-500/10'
+    }
+  }
+
+  const {
+    invoices: projectInvoices,
+    sendInvoice,
+    voidInvoice: voidProjectInvoice,
+    generateProjectInvoices,
+  } = useInvoices({ projectId })
+
+  // Build milestone -> invoice map
+  const milestoneInvoiceMap = new Map(
+    projectInvoices
+      .filter((inv) => inv.milestone_id)
+      .map((inv) => [inv.milestone_id!, inv])
+  )
+
+  const [invoiceActionLoading, setInvoiceActionLoading] = useState<string | null>(null)
+
+  const handleSendMilestoneInvoice = async (invoiceId: string) => {
+    setInvoiceActionLoading(invoiceId)
+    try {
+      await sendInvoice(invoiceId)
+    } catch (err) {
+      console.error('Error sending invoice:', err)
+    } finally {
+      setInvoiceActionLoading(null)
+    }
+  }
+
+  const handleGenerateInvoices = async () => {
+    setInvoiceActionLoading('generate')
+    try {
+      await generateProjectInvoices(projectId)
+    } catch (err) {
+      console.error('Error generating invoices:', err)
+    } finally {
+      setInvoiceActionLoading(null)
     }
   }
 
@@ -915,9 +956,22 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-white">Milestones</h2>
-              <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddMilestone}>
-                Add Milestone
-              </Button>
+              <div className="flex items-center gap-2">
+                {project.budget && project.budget > 0 && project.client_id && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleGenerateInvoices}
+                    disabled={invoiceActionLoading === 'generate'}
+                    leftIcon={invoiceActionLoading === 'generate' ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+                  >
+                    Generate Invoices
+                  </Button>
+                )}
+                <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddMilestone}>
+                  Add Milestone
+                </Button>
+              </div>
             </div>
             {milestones.length === 0 ? (
               <Card className="p-8 text-center">
@@ -960,12 +1014,45 @@ export default function ProjectDetailPage() {
                               <p className="text-sm text-white/40 mt-1">{milestone.description}</p>
                             )}
                             {milestone.payment_amount && milestone.payment_amount > 0 && (
-                              <div className="flex items-center gap-1 mt-2 text-sm text-[#23FD9E]">
-                                <DollarSign className="w-3.5 h-3.5" />
-                                <span>{formatCurrency(milestone.payment_amount)}</span>
-                                {milestone.is_paid && (
-                                  <Badge variant="outline" className="ml-2 text-xs">Paid</Badge>
-                                )}
+                              <div className="flex items-center gap-2 mt-2">
+                                <div className="flex items-center gap-1 text-sm text-[#23FD9E]">
+                                  <DollarSign className="w-3.5 h-3.5" />
+                                  <span>{formatCurrency(milestone.payment_amount)}</span>
+                                </div>
+                                {(() => {
+                                  const inv = milestoneInvoiceMap.get(milestone.id)
+                                  if (inv) {
+                                    return (
+                                      <div className="flex items-center gap-1.5">
+                                        <Badge className={
+                                          inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 text-xs' :
+                                          inv.status === 'sent' ? 'bg-blue-500/10 text-blue-400 text-xs' :
+                                          inv.status === 'overdue' ? 'bg-red-500/10 text-red-400 text-xs' :
+                                          inv.status === 'cancelled' ? 'bg-white/10 text-white/40 text-xs' :
+                                          'bg-white/10 text-white/60 text-xs'
+                                        }>
+                                          {inv.invoice_number} &middot; {inv.status}
+                                        </Badge>
+                                        {inv.status === 'draft' && (
+                                          <button
+                                            onClick={() => handleSendMilestoneInvoice(inv.id)}
+                                            disabled={invoiceActionLoading === inv.id}
+                                            className="p-1 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
+                                            title="Send Invoice"
+                                          >
+                                            {invoiceActionLoading === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                          </button>
+                                        )}
+                                        {inv.stripe_invoice_url && (
+                                          <a href={inv.stripe_invoice_url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-white/[0.06] text-white/40 transition-colors" title="View on Stripe">
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    )
+                                  }
+                                  return null
+                                })()}
                               </div>
                             )}
                           </div>
@@ -1105,6 +1192,9 @@ export default function ProjectDetailPage() {
             <div>
               <h2 className="text-lg font-semibold text-white mb-4">Budget & Profit Dashboard</h2>
               <FinancialDashboard projectId={projectId} />
+            </div>
+            <div>
+              <InvoiceTable projectId={projectId} clientId={project.client_id || undefined} />
             </div>
             <div>
               <ExpenseTable projectId={projectId} />

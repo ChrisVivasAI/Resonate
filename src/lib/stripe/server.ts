@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
@@ -52,4 +53,57 @@ export async function sendInvoice(invoiceId: string) {
 
 export async function getPaymentIntent(paymentIntentId: string) {
   return stripe.paymentIntents.retrieve(paymentIntentId)
+}
+
+export async function ensureStripeCustomer(
+  supabase: SupabaseClient,
+  clientId: string
+): Promise<string> {
+  const { data: client, error } = await supabase
+    .from('clients')
+    .select('id, name, email, stripe_customer_id')
+    .eq('id', clientId)
+    .single()
+
+  if (error || !client) throw new Error('Client not found')
+
+  if (client.stripe_customer_id) {
+    return client.stripe_customer_id
+  }
+
+  const stripeCustomer = await createCustomer(client.email, client.name, {
+    supabase_client_id: clientId,
+  })
+
+  await supabase
+    .from('clients')
+    .update({ stripe_customer_id: stripeCustomer.id })
+    .eq('id', clientId)
+
+  return stripeCustomer.id
+}
+
+export async function voidStripeInvoice(invoiceId: string) {
+  return stripe.invoices.voidInvoice(invoiceId)
+}
+
+export async function getStripeInvoice(invoiceId: string) {
+  return stripe.invoices.retrieve(invoiceId)
+}
+
+export async function finalizeStripeInvoice(invoiceId: string) {
+  return stripe.invoices.finalizeInvoice(invoiceId)
+}
+
+export async function listStripeInvoices(options?: {
+  limit?: number
+  starting_after?: string
+  status?: Stripe.InvoiceListParams['status']
+}) {
+  return stripe.invoices.list({
+    limit: options?.limit || 50,
+    starting_after: options?.starting_after,
+    status: options?.status,
+    expand: ['data.customer'],
+  })
 }

@@ -30,6 +30,7 @@ export interface Project {
   status: 'draft' | 'in_progress' | 'review' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   budget: number
+  deposit_percentage: number
   spent: number
   start_date: string | null
   due_date: string | null

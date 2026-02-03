@@ -5,7 +5,21 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Filter, Clock, DollarSign } from 'lucide-react'
-import { useLabor, type LaborEntry, type LaborInput } from '@/hooks'
+import { useLabor, type LaborEntry, type LaborInput, type BillingType } from '@/hooks'
+
+const BILLING_TYPE_LABELS: Record<string, { badge: string; suffix: string }> = {
+  hourly: { badge: 'Hourly', suffix: '/hr' },
+  per_item: { badge: 'Item', suffix: '/item' },
+  per_asset: { badge: 'Asset', suffix: '/asset' },
+  per_service: { badge: 'Service', suffix: '/service' },
+}
+
+const BILLING_TYPE_COLORS: Record<string, string> = {
+  hourly: 'bg-blue-500/20 text-blue-400',
+  per_item: 'bg-purple-500/20 text-purple-400',
+  per_asset: 'bg-amber-500/20 text-amber-400',
+  per_service: 'bg-emerald-500/20 text-emerald-400',
+}
 import { LaborForm } from './labor-form'
 
 interface LaborTableProps {
@@ -21,8 +35,10 @@ export function LaborTable({ projectId }: LaborTableProps) {
   const [sortField, setSortField] = useState<keyof LaborEntry>('role')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [filterRole, setFilterRole] = useState<string>('')
+  const [filterType, setFilterType] = useState<string>('')
 
   const roles = Array.from(new Set(laborEntries.map((e) => e.role))).sort()
+  const billingTypes = Array.from(new Set(laborEntries.map((e) => e.billing_type || 'hourly'))).sort()
 
   const handleSort = (field: keyof LaborEntry) => {
     if (sortField === field) {
@@ -35,6 +51,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
 
   const sortedEntries = [...laborEntries]
     .filter((e) => !filterRole || e.role === filterRole)
+    .filter((e) => !filterType || (e.billing_type || 'hourly') === filterType)
     .sort((a, b) => {
       const aVal = a[sortField]
       const bVal = b[sortField]
@@ -112,6 +129,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
         initialData={{
           team_member_name: editingEntry.team_member_name || undefined,
           role: editingEntry.role,
+          billing_type: editingEntry.billing_type || 'hourly',
           hourly_rate: editingEntry.hourly_rate,
           estimated_hours: editingEntry.estimated_hours,
           actual_hours: editingEntry.actual_hours,
@@ -127,9 +145,23 @@ export function LaborTable({ projectId }: LaborTableProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Labor / Time Tracking</CardTitle>
         <div className="flex items-center gap-3">
-          {roles.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-obsidian-400" />
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-obsidian-400" />
+            {billingTypes.length > 1 && (
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="bg-obsidian-800 border border-obsidian-700 rounded-lg px-3 py-1.5 text-sm text-slate-300"
+              >
+                <option value="">All Types</option>
+                {billingTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {BILLING_TYPE_LABELS[type]?.badge || type}
+                  </option>
+                ))}
+              </select>
+            )}
+            {roles.length > 0 && (
               <select
                 value={filterRole}
                 onChange={(e) => setFilterRole(e.target.value)}
@@ -142,8 +174,8 @@ export function LaborTable({ projectId }: LaborTableProps) {
                   </option>
                 ))}
               </select>
-            </div>
-          )}
+            )}
+          </div>
           <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowForm(true)}>
             Add Labor Entry
           </Button>
@@ -173,6 +205,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                         Role <SortIcon field="role" />
                       </div>
                     </th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-obsidian-400">Type</th>
                     <th
                       className="text-right py-3 px-4 text-sm font-medium text-obsidian-400 cursor-pointer hover:text-white"
                       onClick={() => handleSort('hourly_rate')}
@@ -186,7 +219,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                       onClick={() => handleSort('estimated_hours')}
                     >
                       <div className="flex items-center justify-end gap-1">
-                        Est. Hours <SortIcon field="estimated_hours" />
+                        Est. Qty <SortIcon field="estimated_hours" />
                       </div>
                     </th>
                     <th
@@ -194,7 +227,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                       onClick={() => handleSort('actual_hours')}
                     >
                       <div className="flex items-center justify-end gap-1">
-                        Actual Hours <SortIcon field="actual_hours" />
+                        Actual Qty <SortIcon field="actual_hours" />
                       </div>
                     </th>
                     <th
@@ -219,14 +252,22 @@ export function LaborTable({ projectId }: LaborTableProps) {
                 <tbody>
                   {sortedEntries.map((entry) => {
                     const variance = Number(entry.actual_cost) - Number(entry.estimated_cost)
+                    const entryType = entry.billing_type || 'hourly'
+                    const typeInfo = BILLING_TYPE_LABELS[entryType] || BILLING_TYPE_LABELS.hourly
+                    const typeColor = BILLING_TYPE_COLORS[entryType] || BILLING_TYPE_COLORS.hourly
                     return (
                       <tr key={entry.id} className="border-b border-obsidian-800/50 hover:bg-obsidian-800/30">
                         <td className="py-3 px-4 text-sm text-slate-300">{entry.team_member_name || '-'}</td>
                         <td className="py-3 px-4">
                           <Badge variant="default">{entry.role}</Badge>
                         </td>
+                        <td className="py-3 px-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${typeColor}`}>
+                            {typeInfo.badge}
+                          </span>
+                        </td>
                         <td className="py-3 px-4 text-sm text-slate-300 text-right">
-                          ${Number(entry.hourly_rate).toFixed(2)}/hr
+                          ${Number(entry.hourly_rate).toFixed(2)}{typeInfo.suffix}
                         </td>
                         <td className="py-3 px-4 text-sm text-slate-300 text-right">
                           {Number(entry.estimated_hours).toFixed(1)}
@@ -278,14 +319,14 @@ export function LaborTable({ projectId }: LaborTableProps) {
                 <div className="flex items-center gap-3 p-3 bg-obsidian-800/30 rounded-xl">
                   <Clock className="w-5 h-5 text-ember-400" />
                   <div>
-                    <div className="text-xs text-obsidian-400">Est. Hours</div>
+                    <div className="text-xs text-obsidian-400">Est. Qty</div>
                     <div className="text-lg font-semibold text-white">{totals.estimatedHours.toFixed(1)}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-obsidian-800/30 rounded-xl">
                   <Clock className="w-5 h-5 text-amber-400" />
                   <div>
-                    <div className="text-xs text-obsidian-400">Actual Hours</div>
+                    <div className="text-xs text-obsidian-400">Actual Qty</div>
                     <div className="text-lg font-semibold text-white">{totals.actualHours.toFixed(1)}</div>
                   </div>
                 </div>

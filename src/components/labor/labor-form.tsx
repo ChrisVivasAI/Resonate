@@ -7,7 +7,7 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { X } from 'lucide-react'
-import type { LaborInput } from '@/hooks/use-labor'
+import type { LaborInput, BillingType } from '@/hooks/use-labor'
 
 interface LaborFormProps {
   projectId: string
@@ -16,6 +16,20 @@ interface LaborFormProps {
   initialData?: Partial<LaborInput>
   isEdit?: boolean
 }
+
+const BILLING_TYPE_CONFIG: Record<BillingType, { label: string; rateLabel: string; rateHint: string; qtyLabel: string; estQtyHint: string; actQtyHint: string; step: string }> = {
+  hourly: { label: 'Hourly', rateLabel: 'Hourly Rate', rateHint: 'Cost per hour', qtyLabel: 'Hours', estQtyHint: 'Planned hours for this role', actQtyHint: 'Hours actually worked', step: '0.5' },
+  per_item: { label: 'Per Item', rateLabel: 'Rate per Item', rateHint: 'Cost per item', qtyLabel: 'Items', estQtyHint: 'Estimated number of items', actQtyHint: 'Actual number of items', step: '1' },
+  per_asset: { label: 'Per Asset', rateLabel: 'Rate per Asset', rateHint: 'Cost per asset', qtyLabel: 'Assets', estQtyHint: 'Estimated number of assets', actQtyHint: 'Actual number of assets', step: '1' },
+  per_service: { label: 'Per Service', rateLabel: 'Rate per Service', rateHint: 'Cost per service', qtyLabel: 'Services', estQtyHint: 'Estimated number of services', actQtyHint: 'Actual number of services', step: '1' },
+}
+
+const BILLING_TYPES: { value: BillingType; label: string }[] = [
+  { value: 'hourly', label: 'Hourly' },
+  { value: 'per_item', label: 'Per Item' },
+  { value: 'per_asset', label: 'Per Asset / Deliverable' },
+  { value: 'per_service', label: 'Per Service' },
+]
 
 const ROLES = [
   'Project Manager',
@@ -48,17 +62,19 @@ export function LaborForm({ projectId, onSubmit, onCancel, initialData, isEdit }
   const [formData, setFormData] = useState({
     team_member_name: initialData?.team_member_name || '',
     role: initialData?.role || '',
+    billing_type: (initialData?.billing_type || 'hourly') as BillingType,
     hourly_rate: initialData?.hourly_rate?.toString() || '',
     estimated_hours: initialData?.estimated_hours?.toString() || '0',
     actual_hours: initialData?.actual_hours?.toString() || '0',
     notes: initialData?.notes || '',
   })
 
-  const hourlyRate = parseFloat(formData.hourly_rate) || 0
-  const estimatedHours = parseFloat(formData.estimated_hours) || 0
-  const actualHours = parseFloat(formData.actual_hours) || 0
-  const estimatedCost = hourlyRate * estimatedHours
-  const actualCost = hourlyRate * actualHours
+  const typeConfig = BILLING_TYPE_CONFIG[formData.billing_type]
+  const rate = parseFloat(formData.hourly_rate) || 0
+  const estimatedQty = parseFloat(formData.estimated_hours) || 0
+  const actualQty = parseFloat(formData.actual_hours) || 0
+  const estimatedCost = rate * estimatedQty
+  const actualCost = rate * actualQty
   const variance = actualCost - estimatedCost
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,9 +86,10 @@ export function LaborForm({ projectId, onSubmit, onCancel, initialData, isEdit }
         project_id: projectId,
         team_member_name: formData.team_member_name || undefined,
         role: formData.role,
-        hourly_rate: hourlyRate,
-        estimated_hours: estimatedHours,
-        actual_hours: actualHours,
+        billing_type: formData.billing_type,
+        hourly_rate: rate,
+        estimated_hours: estimatedQty,
+        actual_hours: actualQty,
         notes: formData.notes || undefined,
       })
     } finally {
@@ -113,8 +130,16 @@ export function LaborForm({ projectId, onSubmit, onCancel, initialData, isEdit }
             />
           </div>
 
+          <Select
+            label="Billing Type"
+            value={formData.billing_type}
+            onChange={(e) => setFormData({ ...formData, billing_type: e.target.value as BillingType })}
+            required
+            options={BILLING_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+          />
+
           <Input
-            label="Hourly Rate"
+            label={typeConfig.rateLabel}
             type="number"
             step="0.01"
             min="0"
@@ -122,28 +147,28 @@ export function LaborForm({ projectId, onSubmit, onCancel, initialData, isEdit }
             onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
             required
             leftIcon={<span className="text-obsidian-400">$</span>}
-            hint="Internal cost per hour"
+            hint={typeConfig.rateHint}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Estimated Hours"
+              label={`Estimated ${typeConfig.qtyLabel}`}
               type="number"
-              step="0.5"
+              step={typeConfig.step}
               min="0"
               value={formData.estimated_hours}
               onChange={(e) => setFormData({ ...formData, estimated_hours: e.target.value })}
-              hint="Planned hours for this role"
+              hint={typeConfig.estQtyHint}
             />
 
             <Input
-              label="Actual Hours"
+              label={`Actual ${typeConfig.qtyLabel}`}
               type="number"
-              step="0.5"
+              step={typeConfig.step}
               min="0"
               value={formData.actual_hours}
               onChange={(e) => setFormData({ ...formData, actual_hours: e.target.value })}
-              hint="Hours actually worked"
+              hint={typeConfig.actQtyHint}
             />
           </div>
 

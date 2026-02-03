@@ -3,12 +3,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+export type BillingType = 'hourly' | 'per_item' | 'per_asset' | 'per_service'
+
 export interface LaborEntry {
   id: string
   project_id: string
   team_member_id: string | null
   team_member_name: string | null
   role: string
+  billing_type: BillingType
   hourly_rate: number
   estimated_hours: number
   actual_hours: number
@@ -26,6 +29,7 @@ export interface LaborInput {
   team_member_id?: string
   team_member_name?: string
   role: string
+  billing_type?: BillingType
   hourly_rate: number
   estimated_hours?: number
   actual_hours?: number

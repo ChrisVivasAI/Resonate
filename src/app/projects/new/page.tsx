@@ -56,6 +56,7 @@ export default function NewProjectPage() {
     status: 'draft' as ProjectStatus,
     priority: 'medium' as ProjectPriority,
     budget: '',
+    deposit_percentage: '50',
     start_date: '',
     due_date: '',
     tags: [] as string[],
@@ -91,6 +92,7 @@ export default function NewProjectPage() {
         status: formData.status,
         priority: formData.priority,
         budget: formData.budget ? parseFloat(formData.budget) : 0,
+        deposit_percentage: formData.deposit_percentage ? parseFloat(formData.deposit_percentage) : 50,
         spent: 0,
         start_date: formData.start_date || null,
         due_date: formData.due_date || null,
@@ -113,6 +115,18 @@ export default function NewProjectPage() {
           // Don't block navigation if generation fails
         } finally {
           setGeneratingPlan(false)
+        }
+      }
+
+      // Auto-generate draft invoices if budget > 0 and client is set
+      const budgetVal = formData.budget ? parseFloat(formData.budget) : 0
+      if (budgetVal > 0 && formData.client_id) {
+        try {
+          await fetch(`/api/projects/${newProject.id}/invoices/generate`, {
+            method: 'POST',
+          })
+        } catch (invErr) {
+          console.error('Error generating invoices:', invErr)
         }
       }
 
@@ -312,6 +326,44 @@ export default function NewProjectPage() {
                   />
                 </div>
               </div>
+
+              {/* Deposit percentage — shown when budget > 0 and client selected */}
+              {formData.budget && parseFloat(formData.budget) > 0 && formData.client_id && (
+                <div className="mt-4 space-y-3">
+                  <div className="max-w-xs">
+                    <label className="block text-sm font-medium text-white/60 mb-2">
+                      Deposit Percentage
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={formData.deposit_percentage}
+                        onChange={(e) => setFormData({ ...formData, deposit_percentage: e.target.value })}
+                        min="0"
+                        max="100"
+                        step="1"
+                        className="w-full px-4 py-3 pr-10 bg-white/[0.04] border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#23FD9E]/50 focus:ring-1 focus:ring-[#23FD9E]/20 transition-colors"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 text-sm">%</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 p-3 bg-white/[0.02] border border-white/5 rounded-lg text-sm">
+                    <div className="text-white/40">
+                      Deposit:{' '}
+                      <span className="text-[#23FD9E] font-medium">
+                        ${((parseFloat(formData.budget) * (parseFloat(formData.deposit_percentage) || 0)) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="text-white/20">|</div>
+                    <div className="text-white/40">
+                      Remaining:{' '}
+                      <span className="text-white/80 font-medium">
+                        ${(parseFloat(formData.budget) - (parseFloat(formData.budget) * (parseFloat(formData.deposit_percentage) || 0)) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
 
             {/* Tags */}

@@ -31,7 +31,7 @@ export { useExpenses } from './use-expenses'
 export type { Expense, ExpenseInput } from './use-expenses'
 
 export { useLabor } from './use-labor'
-export type { LaborEntry, LaborInput } from './use-labor'
+export type { LaborEntry, LaborInput, BillingType } from './use-labor'
 
 export { useProjectFinancials } from './use-project-financials'
 export type { ProjectFinancials } from './use-project-financials'
@@ -47,3 +47,6 @@ export type { ChatMessage, Conversation, ChatResponse, ProjectAISettings } from 
 
 export { useClientNavigation } from './use-client-navigation'
 export type { ClientNavItem } from './use-client-navigation'
+
+export { useInvoices } from './use-invoices'
+export type { InvoiceInput, StripeInvoicePreview } from './use-invoices'

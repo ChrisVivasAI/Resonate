@@ -37,6 +37,7 @@ export interface Project {
   status: 'draft' | 'in_progress' | 'review' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   budget: number
+  deposit_percentage: number
   spent: number
   start_date: string
   due_date: string
@@ -86,6 +87,8 @@ export interface Invoice {
   id: string
   client_id: string
   project_id?: string
+  milestone_id?: string
+  invoice_type: 'deposit' | 'milestone' | 'custom'
   invoice_number: string
   amount: number
   tax_amount: number
@@ -95,11 +98,14 @@ export interface Invoice {
   due_date: string
   paid_at?: string
   stripe_invoice_id?: string
+  stripe_invoice_url?: string
   line_items: InvoiceLineItem[]
   notes?: string
   created_at: string
   updated_at: string
   client?: Client
+  project?: Project
+  milestone?: Milestone
 }
 
 export interface InvoiceLineItem {
