@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { nanoid } from 'nanoid'
 import type { ClientInvitation } from '@/types'
 
@@ -72,9 +72,11 @@ export async function createInvitation(params: CreateInvitationParams): Promise<
 }
 
 export async function validateInvitationToken(token: string): Promise<InvitationValidation> {
-  const supabase = await createClient()
+  // Use admin client to bypass RLS — unauthenticated callers (invite page)
+  // cannot read client_invitations via the anon key
+  const adminClient = createAdminClient()
 
-  const { data: invitation, error } = await supabase
+  const { data: invitation, error } = await adminClient
     .from('client_invitations')
     .select('*, client:clients(*)')
     .eq('token', token)
@@ -86,8 +88,7 @@ export async function validateInvitationToken(token: string): Promise<Invitation
 
   // Check if expired
   if (new Date(invitation.expires_at) < new Date()) {
-    // Update status to expired
-    await supabase
+    await adminClient
       .from('client_invitations')
       .update({ status: 'expired' })
       .eq('id', invitation.id)
@@ -115,6 +116,7 @@ export interface AcceptInvitationParams {
 
 export async function acceptInvitation(params: AcceptInvitationParams): Promise<void> {
   const supabase = await createClient()
+  const adminClient = createAdminClient()
   const { token, password, fullName } = params
 
   // Validate token first
@@ -125,7 +127,8 @@ export async function acceptInvitation(params: AcceptInvitationParams): Promise<
 
   const invitation = validation.invitation
 
-  // Create auth user
+  // Create auth user — include client_id in metadata so the handle_new_user
+  // trigger can set role and client_id at profile creation time
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: invitation.email,
     password,
@@ -133,6 +136,7 @@ export async function acceptInvitation(params: AcceptInvitationParams): Promise<
       data: {
         full_name: fullName,
         role: 'client',
+        client_id: invitation.client_id,
       },
     },
   })
@@ -140,8 +144,11 @@ export async function acceptInvitation(params: AcceptInvitationParams): Promise<
   if (authError) throw new Error(authError.message)
   if (!authData.user) throw new Error('Failed to create user')
 
+  // Use admin client (service role key) for all post-signup DB operations.
+  // The anon-key client has no auth session after signUp(), so RLS blocks updates.
+
   // Update the profile with client role and link to client record
-  const { error: profileError } = await supabase
+  const { error: profileError } = await adminClient
     .from('profiles')
     .update({
       role: 'client',
@@ -151,11 +158,11 @@ export async function acceptInvitation(params: AcceptInvitationParams): Promise<
     .eq('id', authData.user.id)
 
   if (profileError) {
-    console.error('Profile update error:', profileError)
+    throw new Error(`Failed to update profile: ${profileError.message}`)
   }
 
-  // Update client record with profile_id
-  const { error: clientError } = await supabase
+  // Update client record with profile_id and enable portal access
+  const { error: clientError } = await adminClient
     .from('clients')
     .update({
       profile_id: authData.user.id,
@@ -164,11 +171,11 @@ export async function acceptInvitation(params: AcceptInvitationParams): Promise<
     .eq('id', invitation.client_id)
 
   if (clientError) {
-    console.error('Client update error:', clientError)
+    throw new Error(`Failed to update client record: ${clientError.message}`)
   }
 
   // Mark invitation as accepted
-  const { error: inviteError } = await supabase
+  const { error: inviteError } = await adminClient
     .from('client_invitations')
     .update({
       status: 'accepted',

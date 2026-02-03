@@ -11,20 +11,12 @@ import { createClient } from '@/lib/supabase/client'
 export default function DeliverableDetailPage({
   params,
 }: {
-  params: Promise<{ id: string; deliverableId: string }>
+  params: { id: string; deliverableId: string }
 }) {
   const router = useRouter()
-  const [projectId, setProjectId] = useState<string>('')
-  const [deliverableId, setDeliverableId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(params.id)
+  const [deliverableId, setDeliverableId] = useState<string>(params.deliverableId)
   const [userRole, setUserRole] = useState<'admin' | 'member' | 'client'>('member')
-
-  // Resolve params
-  useEffect(() => {
-    params.then(({ id, deliverableId }) => {
-      setProjectId(id)
-      setDeliverableId(deliverableId)
-    })
-  }, [params])
 
   // Fetch user role
   useEffect(() => {

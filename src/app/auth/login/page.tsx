@@ -37,7 +37,22 @@ export default function LoginPage() {
       }
 
       if (data.session) {
-        router.push('/dashboard')
+        // Honor redirect parameter from middleware (set when unauthenticated users hit protected routes)
+        const params = new URLSearchParams(window.location.search)
+        const redirect = params.get('redirect')
+
+        if (redirect) {
+          router.push(redirect)
+        } else {
+          // Fetch profile to route client users to portal
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.session.user.id)
+            .single()
+
+          router.push(profile?.role === 'client' ? '/portal' : '/dashboard')
+        }
         router.refresh()
       }
     } catch (err) {

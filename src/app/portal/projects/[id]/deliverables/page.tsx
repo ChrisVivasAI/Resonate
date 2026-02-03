@@ -19,22 +19,18 @@ import Link from 'next/link'
 export default function ClientDeliverablesPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const selectedId = searchParams.get('id')
 
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(params.id)
   const [loading, setLoading] = useState(true)
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
   const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null)
   const [versions, setVersions] = useState<DeliverableVersion[]>([])
   const [projectName, setProjectName] = useState('')
-
-  useEffect(() => {
-    params.then(({ id }) => setProjectId(id))
-  }, [params])
 
   const fetchDeliverables = useCallback(async () => {
     if (!projectId) return

@@ -44,15 +44,15 @@ export function Partners() {
               }}
               style={{
                 display: 'flex',
-                gap: '2.5rem',
-                paddingRight: '2.5rem'
+                gap: '1.5rem',
+                paddingRight: '1.5rem'
               }}
               whileHover={{ animationPlayState: 'paused' as any }}
             >
               {marqueePartners.map((partner, index) => (
                 <div
                   key={`${partner.name}-${index}`}
-                  className="flex items-center justify-center min-w-[140px] md:min-w-[200px] lg:min-w-[260px] h-20 md:h-28 lg:h-36 px-2 filter grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+                  className="flex items-center justify-center min-w-[180px] md:min-w-[260px] lg:min-w-[340px] h-24 md:h-36 lg:h-44 px-2 filter grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
                 >
                   <div className="relative w-full h-full">
                     <Image

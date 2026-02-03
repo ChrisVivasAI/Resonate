@@ -569,15 +569,19 @@ CREATE POLICY "Users can update their own notifications" ON public.notifications
 CREATE POLICY "System can create notifications" ON public.notifications
     FOR INSERT WITH CHECK (TRUE);
 
+-- Helper function to get client_id for the current user (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.get_client_id()
+RETURNS UUID AS $$
+  SELECT client_id FROM public.profiles WHERE id = auth.uid()
+$$ LANGUAGE SQL SECURITY DEFINER STABLE;
+
+-- Allow client users to read their own client record
+CREATE POLICY "Clients can view own client record" ON public.clients
+    FOR SELECT USING (profile_id = auth.uid());
+
 -- Projects policies for clients (view only their projects)
 CREATE POLICY "Clients can view their projects" ON public.projects
-    FOR SELECT USING (
-        client_id IN (
-            SELECT c.id FROM public.clients c
-            JOIN public.profiles pr ON pr.client_id = c.id
-            WHERE pr.id = auth.uid()
-        )
-    );
+    FOR SELECT USING (client_id = public.get_client_id());
 
 -- Functions for updated_at trigger
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -709,10 +713,27 @@ CREATE TRIGGER update_pages_updated_at BEFORE UPDATE ON public.pages
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to handle new user signup
+CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    _role TEXT;
 BEGIN
-    INSERT INTO public.profiles (id, email, full_name)
-    VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name');
+    -- Read role from metadata, default to 'member' if not provided
+    _role := COALESCE(NEW.raw_user_meta_data->>'role', 'member');
+
+    -- Validate role value
+    IF _role NOT IN ('admin', 'member', 'client') THEN
+        _role := 'member';
+    END IF;
+
+    INSERT INTO public.profiles (id, email, full_name, role, client_id)
+    VALUES (
+        NEW.id,
+        NEW.email,
+        NEW.raw_user_meta_data->>'full_name',
+        _role,
+        (NEW.raw_user_meta_data->>'client_id')::UUID
+    );
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

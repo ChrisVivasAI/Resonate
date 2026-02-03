@@ -2,15 +2,13 @@ export function Manifesto() {
   return (
     <section
       id="about"
-      className="relative flex items-center justify-center overflow-hidden bg-cover bg-center bg-fixed"
-      style={{ backgroundImage: "url('/images/contact-bg.jpg')" }}
+      className="relative flex items-center justify-center overflow-hidden bg-cover bg-center bg-fixed min-h-[80vh]"
+      style={{ backgroundImage: "url('/images/contact-bg.png')" }}
     >
-      {/* Dark fallback behind bg image */}
-      <div className="absolute inset-0 bg-[#1a1a1a]" style={{ zIndex: 0 }} />
       {/* Slight overlay to ensure text readability */}
-      <div className="absolute inset-0 bg-black/30" style={{ zIndex: 1 }} />
+      <div className="absolute inset-0 bg-black/40" style={{ zIndex: 1 }} />
 
-      <div className="relative z-10 max-w-5xl mx-auto px-8 py-16 text-center">
+      <div className="relative z-10 max-w-5xl mx-auto px-8 py-24 text-center">
         <h2 className="font-display text-6xl md:text-8xl text-white mb-12 tracking-display lg:text-8xl">
           RESONATE OR DIE
         </h2>

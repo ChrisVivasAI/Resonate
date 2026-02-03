@@ -24,17 +24,13 @@ import { getStatusColor } from '@/lib/utils'
 export default function ClientProjectDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
   const router = useRouter()
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(params.id)
   const [loading, setLoading] = useState(true)
   const [project, setProject] = useState<Project | null>(null)
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
-
-  useEffect(() => {
-    params.then(({ id }) => setProjectId(id))
-  }, [params])
 
   useEffect(() => {
     if (!projectId) return

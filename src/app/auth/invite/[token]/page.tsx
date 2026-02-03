@@ -19,10 +19,10 @@ interface InvitationData {
 export default function AcceptInvitationPage({
   params,
 }: {
-  params: Promise<{ token: string }>
+  params: { token: string }
 }) {
   const router = useRouter()
-  const [token, setToken] = useState<string>('')
+  const [token, setToken] = useState<string>(params.token)
   const [invitation, setInvitation] = useState<InvitationData | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -36,11 +36,6 @@ export default function AcceptInvitationPage({
     password: '',
     confirmPassword: '',
   })
-
-  // Resolve params
-  useEffect(() => {
-    params.then(({ token }) => setToken(token))
-  }, [params])
 
   // Validate token on mount
   useEffect(() => {

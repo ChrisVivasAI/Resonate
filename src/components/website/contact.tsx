@@ -51,11 +51,9 @@ export function Contact() {
   return (
     <section
       id="contact"
-      className="relative py-24 px-8 overflow-hidden bg-cover bg-center bg-fixed"
-      style={{ backgroundImage: "url('/images/contact-bg.jpg')" }}
+      className="relative py-24 px-8 overflow-hidden bg-cover bg-center bg-fixed bg-[#1a1a1a]"
+      style={{ backgroundImage: "url('/images/contact-bg.png')" }}
     >
-      {/* Dark overlay fallback if image doesn't load */}
-      <div className="absolute inset-0 bg-[#1a1a1a]" style={{ zIndex: 0 }} />
       {/* Overlay to darken the background image */}
       <div className="absolute inset-0 bg-black/40" style={{ zIndex: 1 }} />
 

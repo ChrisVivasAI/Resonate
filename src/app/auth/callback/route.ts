@@ -32,6 +32,21 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      // Route to the correct destination based on user role
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        if (profile?.role === 'client') {
+          return NextResponse.redirect(`${origin}/portal`)
+        }
+      }
+
       return NextResponse.redirect(`${origin}/dashboard`)
     }
   }
