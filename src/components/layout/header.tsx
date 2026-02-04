@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Command, X, FileText, FolderKanban, Users, Sparkles } from 'lucide-react'
 import { Avatar } from '@/components/ui'
 import { NotificationBell } from '@/components/notifications'
+import { HelpButton } from '@/components/help'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks'
 
@@ -87,6 +88,9 @@ export function Header({ title, description, actions }: HeaderProps) {
 
             {/* Quick Actions */}
             {actions}
+
+            {/* Help */}
+            <HelpButton />
 
             {/* Notifications */}
             <NotificationBell />

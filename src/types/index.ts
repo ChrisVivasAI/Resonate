@@ -467,7 +467,7 @@ export interface Milestone {
 // LEADS MANAGEMENT TYPES
 // ============================================
 
-export type LeadSource = 'website' | 'referral' | 'social' | 'event' | 'other'
+export type LeadSource = 'website' | 'referral' | 'social' | 'event' | 'other' | 'help_ticket'
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'converted' | 'lost'
 export type LeadPriority = 'low' | 'medium' | 'high'
 export type LeadActivityType = 'note' | 'email' | 'call' | 'meeting' | 'ai_assist' | 'status_change'
@@ -518,6 +518,7 @@ export interface CreateLeadInput {
   message: string
   source?: LeadSource
   source_page?: string
+  tags?: string[]
 }
 
 export interface UpdateLeadInput {

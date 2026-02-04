@@ -19,9 +19,9 @@ export default function Artist360Page() {
         { name: "MUSIC VIDEOS", image: "/images/services/work-sample.jpg" },
         { name: "ALBUM ART", image: "/images/services/work-sample.jpg" },
         { name: "PRESS KITS", image: "/images/services/work-sample.jpg" },
-        { name: "SOCIAL CONTENT", image: "/images/services/work-sample.jpg" },
-        { name: "MERCHANDISE", image: "/images/services/work-sample.jpg" },
-        { name: "LIVE VISUALS", image: "/images/services/work-sample.jpg" }
+        { name: "SOCIAL CONTENT", image: "/images/services/work-sample.jpg" }
+        //{ name: "MERCHANDISE", image: "/images/services/work-sample.jpg" },
+        //{ name: "LIVE VISUALS", image: "/images/services/work-sample.jpg" }
       ]}
       processTitle="THE ARTIST JOURNEY"
       processDescription="We don't just create content—we build legacies. Our process is designed to understand your unique voice and amplify it across every platform."

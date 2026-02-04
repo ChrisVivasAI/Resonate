@@ -20,9 +20,9 @@ export default function Brand360Page() {
         { name: "BRAND IDENTITIES", image: "/images/services/work-sample.jpg" },
         { name: "CAMPAIGNS", image: "/images/services/work-sample.jpg" },
         { name: "COMMERCIALS", image: "/images/services/work-sample.jpg" },
-        { name: "PODCASTS", image: "/images/services/work-sample.jpg" },
-        { name: "SOCIAL CAMPAIGNS", image: "/images/services/work-sample.jpg" },
-        { name: "PHOTOGRAPHY", image: "/images/services/work-sample.jpg" }
+        { name: "PODCASTS", image: "/images/services/work-sample.jpg" }
+        //{ name: "SOCIAL CAMPAIGNS", image: "/images/services/work-sample.jpg" },
+        //{ name: "PHOTOGRAPHY", image: "/images/services/work-sample.jpg" }
       ]}
       processTitle="THE BRAND BLUEPRINT"
       processDescription="Every iconic brand started with a story. We help you find yours and tell it in a way that commands attention and builds lasting loyalty."

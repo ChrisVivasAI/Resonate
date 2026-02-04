@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
       message,
       source = 'website',
       source_page,
+      tags,
     } = body
 
     if (!name || !email || !message) {
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
         source_page,
         status: 'new',
         priority: 'medium',
+        tags: tags || [],
       })
       .select()
       .single()

@@ -20,9 +20,9 @@ export default function Event360Page() {
         { name: "RECAP VIDEOS", image: "/images/services/work-sample.jpg" },
         { name: "PHOTOGRAPHY", image: "/images/services/work-sample.jpg" },
         { name: "LIVE STREAMS", image: "/images/services/work-sample.jpg" },
-        { name: "SOCIAL DROPS", image: "/images/services/work-sample.jpg" },
-        { name: "HIGHLIGHT REELS", image: "/images/services/work-sample.jpg" },
-        { name: "BTS CONTENT", image: "/images/services/work-sample.jpg" }
+        { name: "SOCIAL DROPS", image: "/images/services/work-sample.jpg" }
+        //{ name: "HIGHLIGHT REELS", image: "/images/services/work-sample.jpg" },
+        //{ name: "BTS CONTENT", image: "/images/services/work-sample.jpg" }
       ]}
       processTitle="THE EVENT EXPERIENCE"
       processDescription="An event is a moment in time—but the content lives forever. We capture every angle so your event becomes a story that keeps being told."
