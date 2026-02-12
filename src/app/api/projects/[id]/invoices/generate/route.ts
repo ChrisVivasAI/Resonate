@@ -38,29 +38,16 @@ export async function POST(
       )
     }
 
-    // Get the last invoice number
-    const { data: lastInvoice } = await supabase
-      .from('invoices')
-      .select('invoice_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    let nextNumber = 1
-    if (lastInvoice?.invoice_number) {
-      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
-      if (match) nextNumber = parseInt(match[1], 10) + 1
-    }
-
     const invoices: Array<Record<string, unknown>> = []
     const depositPercentage = project.deposit_percentage ?? 50
     const budget = Number(project.budget)
+    const defaultDueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     // Create deposit invoice
     const depositAmount = budget * (depositPercentage / 100)
     if (depositAmount > 0) {
-      const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`
-      nextNumber++
+      const { data: invoiceNumber, error: invNumErr } = await supabase.rpc('generate_invoice_number')
+      if (invNumErr) throw new Error(invNumErr.message)
 
       invoices.push({
         client_id: project.client_id,
@@ -72,6 +59,7 @@ export async function POST(
         total_amount: depositAmount,
         currency: 'usd',
         status: 'draft',
+        due_date: defaultDueDate,
         line_items: [
           {
             id: crypto.randomUUID(),
@@ -95,8 +83,8 @@ export async function POST(
     for (const milestone of milestones) {
       const paymentAmount = Number(milestone.payment_amount || 0)
       if (paymentAmount > 0) {
-        const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`
-        nextNumber++
+        const { data: invoiceNumber, error: invNumErr } = await supabase.rpc('generate_invoice_number')
+        if (invNumErr) throw new Error(invNumErr.message)
         milestoneTotal += paymentAmount
 
         invoices.push({
@@ -110,6 +98,7 @@ export async function POST(
           total_amount: paymentAmount,
           currency: 'usd',
           status: 'draft',
+          due_date: defaultDueDate,
           line_items: [
             {
               id: crypto.randomUUID(),
@@ -126,8 +115,8 @@ export async function POST(
     // If there's remaining balance and no milestone invoices covered it
     const remaining = budget - depositAmount - milestoneTotal
     if (remaining > 0 && milestones.length === 0) {
-      const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`
-      nextNumber++
+      const { data: invoiceNumber, error: invNumErr } = await supabase.rpc('generate_invoice_number')
+      if (invNumErr) throw new Error(invNumErr.message)
 
       invoices.push({
         client_id: project.client_id,
@@ -139,6 +128,7 @@ export async function POST(
         total_amount: remaining,
         currency: 'usd',
         status: 'draft',
+        due_date: defaultDueDate,
         line_items: [
           {
             id: crypto.randomUUID(),

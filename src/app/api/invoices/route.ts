@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,6 +10,15 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Get user role for authorization scoping
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, client_id')
+      .eq('id', user.id)
+      .single()
+
+    const userRole = profile?.role || 'member'
 
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
@@ -20,6 +30,20 @@ export async function GET(request: NextRequest) {
       .from('invoices')
       .select('*, client:clients(id, name, email, company), project:projects(id, name)')
       .order('created_at', { ascending: false })
+
+    // Client users can only see their own invoices
+    if (userRole === 'client') {
+      const { data: clientRecord } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('profile_id', user.id)
+        .single()
+
+      if (!clientRecord) {
+        return NextResponse.json({ error: 'Client record not found' }, { status: 403 })
+      }
+      query = query.eq('client_id', clientRecord.id)
+    }
 
     if (projectId) query = query.eq('project_id', projectId)
     if (clientId) query = query.eq('client_id', clientId)
@@ -34,7 +58,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching invoices:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch invoices' },
+      { error: 'Failed to fetch invoices' },
       { status: 500 }
     )
   }
@@ -47,6 +71,26 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit: 30 creates per minute
+    const { allowed } = checkRateLimit(user.id, 'invoice:create', 30)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      )
+    }
+
+    // Only admin/member can create invoices
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || !['admin', 'member'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
@@ -69,22 +113,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate invoice number (INV-0001 pattern)
-    const { data: lastInvoice } = await supabase
-      .from('invoices')
-      .select('invoice_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    let nextNumber = 1
-    if (lastInvoice?.invoice_number) {
-      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
-      if (match) nextNumber = parseInt(match[1], 10) + 1
+    // Validate amount > 0
+    if (typeof amount !== 'number' && typeof amount !== 'string') {
+      return NextResponse.json({ error: 'Amount must be a number' }, { status: 400 })
     }
-    const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`
+    const parsedAmount = Number(amount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      return NextResponse.json({ error: 'Amount must be greater than 0' }, { status: 400 })
+    }
 
-    const totalAmount = Number(amount) + Number(tax_amount)
+    // Validate tax_amount >= 0
+    const parsedTaxAmount = Number(tax_amount)
+    if (!Number.isFinite(parsedTaxAmount) || parsedTaxAmount < 0) {
+      return NextResponse.json({ error: 'Tax amount must be 0 or greater' }, { status: 400 })
+    }
+
+    // Validate due_date if provided
+    if (due_date) {
+      const parsedDate = new Date(due_date)
+      if (isNaN(parsedDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid due date' }, { status: 400 })
+      }
+    }
+
+    // Generate invoice number atomically via DB sequence
+    const { data: invoiceNumberData, error: invoiceNumberError } = await supabase.rpc('generate_invoice_number')
+    if (invoiceNumberError) throw new Error(invoiceNumberError.message)
+    const invoiceNumber = invoiceNumberData as string
+
+    const totalAmount = parsedAmount + parsedTaxAmount
 
     const { data: invoice, error } = await supabase
       .from('invoices')
@@ -94,14 +151,14 @@ export async function POST(request: NextRequest) {
         milestone_id: milestone_id || null,
         invoice_type,
         invoice_number: invoiceNumber,
-        amount: Number(amount),
-        tax_amount: Number(tax_amount),
+        amount: parsedAmount,
+        tax_amount: parsedTaxAmount,
         total_amount: totalAmount,
         currency: 'usd',
         status: 'draft',
         due_date: due_date || null,
         line_items: line_items.length > 0 ? line_items : [
-          { id: crypto.randomUUID(), description: 'Services', quantity: 1, unit_price: Number(amount), total: Number(amount) },
+          { id: crypto.randomUUID(), description: 'Services', quantity: 1, unit_price: parsedAmount, total: parsedAmount },
         ],
         notes: notes || null,
       })
@@ -114,7 +171,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating invoice:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create invoice' },
+      { error: 'Failed to create invoice' },
       { status: 500 }
     )
   }

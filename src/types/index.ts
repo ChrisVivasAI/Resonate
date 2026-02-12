@@ -73,10 +73,11 @@ export interface Payment {
   invoice_id?: string
   amount: number
   currency: string
-  status: 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded'
+  status: 'pending' | 'processing' | 'succeeded' | 'failed' | 'refunded' | 'canceled' | 'disputed'
   payment_method?: string
   stripe_payment_intent_id?: string
   description?: string
+  paid_at?: string
   created_at: string
   updated_at: string
   client?: Client
@@ -95,7 +96,7 @@ export interface Invoice {
   total_amount: number
   currency: string
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
-  due_date: string
+  due_date: string | null
   paid_at?: string
   stripe_invoice_id?: string
   stripe_invoice_url?: string

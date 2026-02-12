@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { stripe, ensureStripeCustomer } from '@/lib/stripe/server'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(
   request: NextRequest,
@@ -12,6 +13,26 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit: 10 sends per minute
+    const { allowed } = checkRateLimit(user.id, 'invoice:send', 10)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      )
+    }
+
+    // Only admin/member can send invoices
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || !['admin', 'member'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Fetch the invoice
@@ -35,6 +56,23 @@ export async function POST(
     if (!invoice.client_id) {
       return NextResponse.json(
         { error: 'Invoice must have a client to send' },
+        { status: 400 }
+      )
+    }
+
+    // Validate invoice amount before sending to Stripe
+    const invoiceAmount = Number(invoice.amount)
+    if (!Number.isFinite(invoiceAmount) || invoiceAmount <= 0) {
+      return NextResponse.json(
+        { error: 'Invoice amount must be greater than 0' },
+        { status: 400 }
+      )
+    }
+
+    const invoiceTaxAmount = Number(invoice.tax_amount)
+    if (!Number.isFinite(invoiceTaxAmount) || invoiceTaxAmount < 0) {
+      return NextResponse.json(
+        { error: 'Invoice tax amount is invalid' },
         { status: 400 }
       )
     }
@@ -72,15 +110,35 @@ export async function POST(
     }>
 
     if (lineItems.length > 0) {
+      const expectedTotalCents = Math.round(invoiceAmount * 100)
+      const itemCents: number[] = []
+
       for (const item of lineItems) {
         const qty = Number(item.quantity) || 1
         const unitPrice = Number(item.unit_price) || 0
+        const unitAmountCents = Math.round(unitPrice * 100)
+        itemCents.push(unitAmountCents * qty)
         await stripe.invoiceItems.create({
           customer: stripeCustomerId,
           invoice: stripeInvoice.id,
           description: item.description || 'Services',
           quantity: qty,
-          unit_amount: Math.round(unitPrice * 100),
+          unit_amount: unitAmountCents,
+          currency: invoice.currency || 'usd',
+        })
+      }
+
+      // Reconcile rounding: if sum of rounded cents drifts from DB total,
+      // add a correction line item so Stripe total matches exactly.
+      const actualTotalCents = itemCents.reduce((a, b) => a + b, 0)
+      const discrepancy = expectedTotalCents - actualTotalCents
+      if (discrepancy !== 0) {
+        await stripe.invoiceItems.create({
+          customer: stripeCustomerId,
+          invoice: stripeInvoice.id,
+          description: 'Rounding adjustment',
+          quantity: 1,
+          unit_amount: discrepancy,
           currency: invoice.currency || 'usd',
         })
       }
@@ -91,19 +149,19 @@ export async function POST(
         invoice: stripeInvoice.id,
         description: `Invoice ${invoice.invoice_number}`,
         quantity: 1,
-        unit_amount: Math.round(Number(invoice.amount) * 100),
+        unit_amount: Math.round(invoiceAmount * 100),
         currency: invoice.currency || 'usd',
       })
     }
 
     // Add tax as a separate item if applicable
-    if (Number(invoice.tax_amount) > 0) {
+    if (invoiceTaxAmount > 0) {
       await stripe.invoiceItems.create({
         customer: stripeCustomerId,
         invoice: stripeInvoice.id,
         description: 'Tax',
         quantity: 1,
-        unit_amount: Math.round(Number(invoice.tax_amount) * 100),
+        unit_amount: Math.round(invoiceTaxAmount * 100),
         currency: invoice.currency || 'usd',
       })
     }
@@ -130,7 +188,7 @@ export async function POST(
   } catch (error) {
     console.error('Error sending invoice:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to send invoice' },
+      { error: 'Failed to send invoice' },
       { status: 500 }
     )
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { listStripeInvoices } from '@/lib/stripe/server'
+import { checkRateLimit } from '@/lib/rate-limit'
 import Stripe from 'stripe'
 
 export async function GET(request: NextRequest) {
@@ -10,6 +11,26 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit: 20 stripe list requests per minute
+    const { allowed } = checkRateLimit(user.id, 'stripe:list', 20)
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      )
+    }
+
+    // Only admin/member can list Stripe invoices
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || !['admin', 'member'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -43,8 +64,8 @@ export async function GET(request: NextRequest) {
           number: inv.number,
           customer_name: customer?.name || null,
           customer_email: customer?.email || null,
-          amount_due: inv.amount_due / 100,
-          amount_paid: inv.amount_paid / 100,
+          amount_due: Number((inv.amount_due / 100).toFixed(2)),
+          amount_paid: Number((inv.amount_paid / 100).toFixed(2)),
           status: inv.status,
           due_date: inv.due_date,
           created: inv.created,
@@ -62,7 +83,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching Stripe invoices:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch Stripe invoices' },
+      { error: 'Failed to fetch Stripe invoices' },
       { status: 500 }
     )
   }

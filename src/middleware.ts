@@ -1,7 +1,34 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function applyCorsHeaders(request: NextRequest, response: NextResponse): NextResponse {
+  const origin = request.headers.get('origin')
+  const host = request.headers.get('host')
+
+  if (origin && host) {
+    try {
+      const originUrl = new URL(origin)
+      if (originUrl.host === host) {
+        response.headers.set('Access-Control-Allow-Origin', origin)
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.set('Access-Control-Allow-Credentials', 'true')
+      }
+    } catch {
+      // Invalid origin URL, skip CORS headers
+    }
+  }
+
+  return response
+}
+
 export async function middleware(request: NextRequest) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    const preflightResponse = NextResponse.next({ request: { headers: request.headers } })
+    return applyCorsHeaders(request, preflightResponse)
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
@@ -45,7 +72,7 @@ export async function middleware(request: NextRequest) {
 
   // Allow public invite path without authentication
   if (isInvitePath) {
-    return response
+    return applyCorsHeaders(request, response)
   }
 
   // Redirect unauthenticated users from protected paths
@@ -95,9 +122,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return response
+  return applyCorsHeaders(request, response)
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|public|api/webhooks|api/).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|public|api/webhooks).*)'],
 }

@@ -14,10 +14,21 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Only admin/member can void invoices
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || !['admin', 'member'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     // Fetch the invoice
     const { data: invoice, error: fetchError } = await supabase
       .from('invoices')
-      .select('id, status, stripe_invoice_id')
+      .select('id, status, stripe_invoice_id, client_id')
       .eq('id', params.id)
       .single()
 
@@ -25,9 +36,9 @@ export async function POST(
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
-    if (invoice.status !== 'sent') {
+    if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
       return NextResponse.json(
-        { error: 'Only sent invoices can be voided' },
+        { error: 'Only sent or overdue invoices can be voided' },
         { status: 400 }
       )
     }
@@ -51,7 +62,7 @@ export async function POST(
   } catch (error) {
     console.error('Error voiding invoice:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to void invoice' },
+      { error: 'Failed to void invoice' },
       { status: 500 }
     )
   }

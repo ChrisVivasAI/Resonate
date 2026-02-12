@@ -59,15 +59,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: client } = await supabase
+    // Try matching by stripe_customer_id first
+    let { data: client } = await supabase
       .from('clients')
       .select('id')
       .eq('stripe_customer_id', stripeCustomerId)
       .single()
 
+    // Fallback: match by customer email
+    if (!client) {
+      const customer = stripeInvoice.customer as Stripe.Customer | null
+      const customerEmail = typeof stripeInvoice.customer === 'string'
+        ? stripeInvoice.customer_email
+        : customer?.email
+
+      if (customerEmail) {
+        const { data: emailClient } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', customerEmail)
+          .single()
+
+        if (emailClient) {
+          client = emailClient
+          // Link this Stripe customer to the client for future lookups
+          await supabase
+            .from('clients')
+            .update({ stripe_customer_id: stripeCustomerId })
+            .eq('id', emailClient.id)
+        }
+      }
+    }
+
     if (!client) {
       return NextResponse.json(
-        { error: 'Client not found. Link the Stripe customer to a client in your database first.' },
+        { error: 'Client not found. No client in your database matches this Stripe customer\'s ID or email.' },
         { status: 404 }
       )
     }
@@ -83,25 +109,14 @@ export async function POST(request: NextRequest) {
         id: crypto.randomUUID(),
         description: line.description || 'Line item',
         quantity: qty,
-        unit_price: qty > 0 ? total / qty : total,
+        unit_price: qty > 0 ? Math.round((total / qty) * 100) / 100 : total,
         total,
       }
     })
 
-    // Generate invoice number
-    const { data: lastInvoice } = await supabase
-      .from('invoices')
-      .select('invoice_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    let nextNumber = 1
-    if (lastInvoice?.invoice_number) {
-      const match = lastInvoice.invoice_number.match(/INV-(\d+)/)
-      if (match) nextNumber = parseInt(match[1], 10) + 1
-    }
-    const invoiceNumber = `INV-${String(nextNumber).padStart(4, '0')}`
+    // Generate invoice number atomically via DB sequence
+    const { data: invoiceNumber, error: invNumErr } = await supabase.rpc('generate_invoice_number')
+    if (invNumErr) throw new Error(invNumErr.message)
 
     const amount = (stripeInvoice.subtotal || 0) / 100
     const taxAmount = (stripeInvoice.tax || 0) / 100
@@ -142,7 +157,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error importing Stripe invoice:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to import Stripe invoice' },
+      { error: 'Failed to import Stripe invoice' },
       { status: 500 }
     )
   }

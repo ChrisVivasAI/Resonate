@@ -67,17 +67,17 @@ export async function GET(
     const clientBudget = Number(project.budget) || 0
     const internalBudgetCap = Number(project.internal_budget_cap) || 0
 
-    const grossProfit = totalClientCharges - totalInternalCost
-    const profitMargin = totalClientCharges > 0 ? (grossProfit / totalClientCharges) * 100 : 0
+    const outstandingInvoices = invoices?.filter(i => ['sent', 'overdue'].includes(i.status))
+      .reduce((sum, i) => sum + Number(i.total_amount), 0) || 0
+
+    const paidInvoices = invoices?.filter(i => i.status === 'paid')
+      .reduce((sum, i) => sum + Number(i.total_amount), 0) || 0
+
+    const grossProfit = paidInvoices - totalInternalCost
+    const profitMargin = paidInvoices > 0 ? (grossProfit / paidInvoices) * 100 : 0
 
     const remainingBudget = clientBudget - totalClientCharges
     const remainingInternalBudget = internalBudgetCap - totalInternalCost
-
-    const outstandingInvoices = invoices?.filter(i => ['sent', 'overdue'].includes(i.status))
-      .reduce((sum, i) => sum + Number(i.amount), 0) || 0
-
-    const paidInvoices = invoices?.filter(i => i.status === 'paid')
-      .reduce((sum, i) => sum + Number(i.amount), 0) || 0
 
     // Expense breakdown by category
     const expensesByCategory = expenses?.reduce((acc, e) => {
@@ -148,7 +148,7 @@ export async function GET(
         byRole: laborByRole,
       },
       invoices: {
-        total: invoices?.reduce((sum, i) => sum + Number(i.amount), 0) || 0,
+        total: invoices?.reduce((sum, i) => sum + Number(i.total_amount), 0) || 0,
         outstanding: outstandingInvoices,
         paid: paidInvoices,
         count: invoices?.length || 0,
