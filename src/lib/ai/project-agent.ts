@@ -29,6 +29,7 @@ export interface ProjectContext {
     priority: string
     due_date: string | null
     assigned_to: string | null
+    assignee_id: string | null
     completed_at: string | null
     order: number
   }>
@@ -97,6 +98,12 @@ export interface ProjectContext {
     description: string
     created_at: string
   }>
+  teamMembers?: Array<{
+    id: string
+    full_name: string
+    role: string
+    source: 'profile' | 'external'
+  }>
   similarProjects?: Array<{
     id: string
     name: string
@@ -154,9 +161,9 @@ const AGENT_TOOLS = {
       properties: {
         title: { type: 'string', description: 'Task title' },
         description: { type: 'string', description: 'Task description' },
-        priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'Task priority' },
+        priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Task priority' },
         due_date: { type: 'string', description: 'Due date in YYYY-MM-DD format' },
-        assigned_to: { type: 'string', description: 'Name of person assigned (optional)' },
+        assigned_to: { type: 'string', description: 'UUID of team member to assign this task to. Reference team members by their ID shown in the Team Members section.' },
       },
       required: ['title'],
     },
@@ -172,9 +179,10 @@ const AGENT_TOOLS = {
         task_id: { type: 'string', description: 'ID of the task to update' },
         title: { type: 'string', description: 'New task title' },
         description: { type: 'string', description: 'New task description' },
-        status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'cancelled'], description: 'New status' },
-        priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'New priority' },
+        status: { type: 'string', enum: ['todo', 'in_progress', 'review', 'completed'], description: 'New status' },
+        priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'New priority' },
         due_date: { type: 'string', description: 'New due date in YYYY-MM-DD format' },
+        assigned_to: { type: 'string', description: 'UUID of team member to assign to (or empty to unassign)' },
       },
       required: ['task_id'],
     },
@@ -541,8 +549,13 @@ function buildSystemPrompt(context: ProjectContext): string {
 
 ## Tasks (${context.tasks.length} total)
 ${context.tasks.length > 0
-    ? context.tasks.map(t => `- [${t.id}] [${t.status}] ${t.title} (${t.priority} priority)${t.due_date ? ` - Due: ${t.due_date}` : ''}`).join('\n')
+    ? context.tasks.map(t => `- [${t.id}] [${t.status}] ${t.title} (${t.priority} priority)${t.due_date ? ` - Due: ${t.due_date}` : ''}${t.assignee_id ? ` - Assigned: ${t.assignee_id}` : ''}`).join('\n')
     : 'No tasks yet'}
+
+## Team Members
+${context.teamMembers && context.teamMembers.length > 0
+    ? context.teamMembers.map(m => `- [${m.id}] ${m.full_name} (${m.role}) — ${m.source}`).join('\n')
+    : 'No team members loaded'}
 
 ## Milestones (${context.milestones.length} total)
 ${context.milestones.length > 0
@@ -738,6 +751,7 @@ export interface GeneratedProjectPlan {
     priority: 'low' | 'medium' | 'high'
     estimated_days: number
     sort_order: number
+    assigned_to_name?: string
   }>
   milestones: Array<{
     title: string
@@ -777,7 +791,8 @@ export async function generateProjectPlan(
     start_date?: string
     due_date?: string
     project_type?: string
-  }
+  },
+  team_members?: Array<{ id: string; full_name: string; role: string }>
 ): Promise<GeneratedProjectPlan> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
@@ -800,7 +815,9 @@ export async function generateProjectPlan(
 **Budget:** ${projectInfo.budget ? `$${projectInfo.budget.toLocaleString()}` : 'Not specified'}
 **Timeline:** ${projectInfo.start_date || 'Not specified'} to ${projectInfo.due_date || 'Not specified'} (approximately ${projectDurationDays} days)
 **Type:** ${projectInfo.project_type || 'Creative project'}
-
+${team_members && team_members.length > 0
+    ? `\nThe following team members are available. Assign each task to the most appropriate team member based on their role and the task requirements:\n${team_members.map(m => `- ${m.full_name} (${m.role})`).join('\n')}\n`
+    : ''}
 Generate a detailed project plan. IMPORTANT: Follow the JSON schema EXACTLY as specified below.
 
 STRICT REQUIREMENTS:
@@ -820,7 +837,8 @@ Respond with ONLY a valid JSON object (no markdown, no explanation) following th
       "description": "Detailed task description",
       "priority": "low|medium|high",
       "estimated_days": 5,
-      "sort_order": 1
+      "sort_order": 1,
+      "assigned_to_name": "Full name of assigned team member (optional)"
     }
   ],
   "milestones": [

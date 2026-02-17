@@ -22,6 +22,7 @@ export type { GenerateData } from './use-generation'
 
 export { useDeliverables } from './use-deliverables'
 export { useComments } from './use-comments'
+export { useTaskComments } from './use-task-comments'
 export { useActivity } from './use-activity'
 export { useProjectHealth, useTaskSuggestions, useStatusSummary } from './use-project-health'
 export { useNotifications } from './use-notifications'

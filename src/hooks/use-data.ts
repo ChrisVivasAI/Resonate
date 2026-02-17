@@ -332,6 +332,7 @@ export function useProject(projectId: string | null) {
     status?: 'todo' | 'in_progress' | 'review' | 'completed'
     due_date?: string
     assigned_to?: string
+    assignee_id?: string
   }) => {
     if (!projectId) return null
 
@@ -344,6 +345,7 @@ export function useProject(projectId: string | null) {
         priority: task.priority || 'medium',
         due_date: task.due_date || null,
         assigned_to: task.assigned_to || null,
+        assignee_id: task.assignee_id || null,
         status: task.status || 'todo',
       })
       .select()
@@ -361,6 +363,7 @@ export function useProject(projectId: string | null) {
     priority?: 'low' | 'medium' | 'high'
     due_date?: string | null
     assigned_to?: string | null
+    assignee_id?: string | null
   }) => {
     const { data, error } = await supabase
       .from('tasks')

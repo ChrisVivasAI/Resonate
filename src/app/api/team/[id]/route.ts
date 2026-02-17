@@ -51,6 +51,13 @@ export async function GET(
       throw new Error(laborError.message)
     }
 
+    // Get tasks assigned to this team member
+    const { data: assignedTasks } = await supabase
+      .from('tasks')
+      .select('*, project:projects(id, name, status)')
+      .eq('assignee_id', memberId)
+      .order('created_at', { ascending: false })
+
     // Calculate totals
     const entries = laborEntries || []
     const projectIds = new Set(entries.map(l => l.project_id))
@@ -66,6 +73,7 @@ export async function GET(
       profile,
       source,
       laborEntries: entries,
+      assignedTasks: assignedTasks || [],
       totals: {
         totalEarned,
         totalOwed,

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import type { ToolCall, ToolResult, ProjectContext } from './project-agent'
+import { createTaskAssignedNotification } from '@/lib/notifications/create-task-notification'
 
 // =====================================================
 // TOOL EXECUTOR
@@ -33,33 +34,60 @@ export async function executeToolCall(
             priority: priority || 'medium',
             due_date,
             status: 'todo', // Database uses 'todo' not 'pending'
+            assignee_id: assigned_to || null,
           })
           .select()
           .single()
 
         if (error) throw error
+
+        if (assigned_to) {
+          await createTaskAssignedNotification(
+            supabase,
+            assigned_to,
+            { id: data.id, title, project_id: projectId },
+            'AI Agent'
+          )
+        }
+
         return { call_id: toolCall.id, result: { success: true, task: data, message: `Created task: ${title}` } }
       }
 
       case 'update_task': {
-        const { task_id, ...updates } = toolCall.args as {
+        const { task_id, assigned_to, ...updates } = toolCall.args as {
           task_id: string
           title?: string
           description?: string
           status?: string
           priority?: string
           due_date?: string
+          assigned_to?: string
+        }
+
+        const dbUpdates: Record<string, unknown> = { ...updates }
+        if (assigned_to !== undefined) {
+          dbUpdates.assignee_id = assigned_to || null
         }
 
         const { data, error } = await supabase
           .from('tasks')
-          .update(updates)
+          .update(dbUpdates)
           .eq('id', task_id)
           .eq('project_id', projectId)
           .select()
           .single()
 
         if (error) throw error
+
+        if (assigned_to) {
+          await createTaskAssignedNotification(
+            supabase,
+            assigned_to,
+            { id: task_id, title: data.title, project_id: projectId },
+            'AI Agent'
+          )
+        }
+
         return { call_id: toolCall.id, result: { success: true, task: data, message: `Updated task: ${data.title}` } }
       }
 

@@ -36,7 +36,8 @@ import {
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, Button, Badge, Avatar, Progress, Modal, Input, Textarea, Select } from '@/components/ui'
 import type { Task, Milestone, Deliverable, Project } from '@/types'
-import { useProject, useProjectHealth, useActivity, useDeliverables, useClients, useInvoices } from '@/hooks'
+import { useProject, useProjectHealth, useActivity, useDeliverables, useClients, useInvoices, useTeamMembers } from '@/hooks'
+import { TaskComments } from '@/components/tasks/task-comments'
 import { Image as ImageIcon, Video, Music, FileText as FileTextIcon, Code } from 'lucide-react'
 import { HealthReport, MonitoringConfig } from '@/components/ai'
 import { ActivityFeed } from '@/components/collaboration/activity-feed'
@@ -82,7 +83,9 @@ export default function ProjectDetailPage() {
     priority: 'medium' as Task['priority'],
     status: 'todo' as Task['status'],
     due_date: '',
+    assignee_id: '',
   })
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [taskLoading, setTaskLoading] = useState(false)
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
 
@@ -151,6 +154,7 @@ export default function ProjectDetailPage() {
   } = useProject(projectId)
 
   const { clients } = useClients()
+  const { members: teamMembers } = useTeamMembers()
 
   const {
     deliverables,
@@ -247,6 +251,7 @@ export default function ProjectDetailPage() {
       priority: 'medium',
       status: 'todo',
       due_date: '',
+      assignee_id: '',
     })
     setShowTaskModal(true)
   }
@@ -259,6 +264,7 @@ export default function ProjectDetailPage() {
       priority: task.priority,
       status: task.status,
       due_date: task.due_date?.split('T')[0] || '',
+      assignee_id: task.assignee_id || '',
     })
     setShowTaskModal(true)
   }
@@ -274,6 +280,7 @@ export default function ProjectDetailPage() {
           priority: taskForm.priority,
           status: taskForm.status,
           due_date: taskForm.due_date || undefined,
+          assignee_id: taskForm.assignee_id || undefined,
         })
       } else {
         await addTask({
@@ -282,6 +289,7 @@ export default function ProjectDetailPage() {
           priority: taskForm.priority,
           status: taskForm.status,
           due_date: taskForm.due_date || undefined,
+          assignee_id: taskForm.assignee_id || undefined,
         })
       }
       setShowTaskModal(false)
@@ -880,71 +888,91 @@ export default function ProjectDetailPage() {
             ) : (
               <div className="space-y-2">
                 {tasks.map((task) => (
-                  <Card key={task.id} className="p-4 group hover:border-white/10 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleToggleTaskStatus(task)}
-                          className={cn(
-                            'w-5 h-5 rounded border-2 flex items-center justify-center transition-all',
-                            task.status === 'completed'
-                              ? 'bg-[#23FD9E] border-[#23FD9E]'
-                              : 'border-white/20 hover:border-[#23FD9E]/50'
-                          )}
-                        >
-                          {task.status === 'completed' && (
-                            <Check className="w-3 h-3 text-[#1a1a1a]" />
-                          )}
-                        </button>
-                        <div>
-                          <p className={cn(
-                            'font-medium',
-                            task.status === 'completed' ? 'text-white/40 line-through' : 'text-white'
-                          )}>
-                            {task.title}
-                          </p>
-                          {task.description && (
-                            <p className="text-sm text-white/40 line-clamp-1">{task.description}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {task.due_date && (
-                          <span className={cn(
-                            'text-sm',
-                            new Date(task.due_date) < new Date() && task.status !== 'completed'
-                              ? 'text-red-400'
-                              : 'text-white/40'
-                          )}>
-                            {formatDate(task.due_date, 'MMM d')}
-                          </span>
-                        )}
-                        <Badge className={getPriorityColor(task.priority)}>
-                          {task.priority}
-                        </Badge>
-                        <div className="flex items-center gap-1">
+                  <Card key={task.id} className="group hover:border-white/10 transition-colors">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                           <button
-                            onClick={() => openEditTask(task)}
-                            className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                            title="Edit task"
+                            onClick={() => handleToggleTaskStatus(task)}
+                            className={cn(
+                              'w-5 h-5 rounded border-2 flex items-center justify-center transition-all',
+                              task.status === 'completed'
+                                ? 'bg-[#23FD9E] border-[#23FD9E]'
+                                : 'border-white/20 hover:border-[#23FD9E]/50'
+                            )}
                           >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTask(task.id)}
-                            disabled={deletingTaskId === task.id}
-                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
-                            title="Delete task"
-                          >
-                            {deletingTaskId === task.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
+                            {task.status === 'completed' && (
+                              <Check className="w-3 h-3 text-[#1a1a1a]" />
                             )}
                           </button>
+                          <div>
+                            <button
+                              onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                              className={cn(
+                                'font-medium text-left hover:text-[#23FD9E] transition-colors',
+                                task.status === 'completed' ? 'text-white/40 line-through' : 'text-white'
+                              )}
+                            >
+                              {task.title}
+                            </button>
+                            {task.description && expandedTaskId !== task.id && (
+                              <p className="text-sm text-white/40 line-clamp-1">{task.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {task.assignee_id && teamMembers && (
+                            <span className="text-sm text-white/50">
+                              {teamMembers.find(m => m.id === task.assignee_id)?.full_name || 'Assigned'}
+                            </span>
+                          )}
+                          {task.due_date && (
+                            <span className={cn(
+                              'text-sm',
+                              new Date(task.due_date) < new Date() && task.status !== 'completed'
+                                ? 'text-red-400'
+                                : 'text-white/40'
+                            )}>
+                              {formatDate(task.due_date, 'MMM d')}
+                            </span>
+                          )}
+                          <Badge className={getPriorityColor(task.priority)}>
+                            {task.priority}
+                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openEditTask(task)}
+                              className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                              title="Edit task"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              disabled={deletingTaskId === task.id}
+                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
+                              title="Delete task"
+                            >
+                              {deletingTaskId === task.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
+                    {expandedTaskId === task.id && (
+                      <div className="px-4 pb-4 pt-0 border-t border-white/[0.06] mt-0">
+                        <div className="pt-3 space-y-4">
+                          {task.description && (
+                            <p className="text-sm text-white/60">{task.description}</p>
+                          )}
+                          <TaskComments taskId={task.id} />
+                        </div>
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>
@@ -1293,6 +1321,15 @@ export default function ProjectDetailPage() {
               ]}
             />
           </div>
+          <Select
+            label="Assign To"
+            value={taskForm.assignee_id}
+            onChange={(e) => setTaskForm({ ...taskForm, assignee_id: e.target.value })}
+            options={[
+              { value: '', label: 'Unassigned' },
+              ...(teamMembers || []).map(m => ({ value: m.id, label: m.full_name })),
+            ]}
+          />
           <Input
             label="Due Date"
             type="date"

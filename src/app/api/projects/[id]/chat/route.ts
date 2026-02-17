@@ -22,7 +22,7 @@ async function buildProjectContext(supabase: ReturnType<typeof createClient> ext
   // Fetch tasks with all fields
   const { data: tasks } = await supabase
     .from('tasks')
-    .select('id, title, description, status, priority, due_date, assigned_to, completed_at, sort_order')
+    .select('id, title, description, status, priority, due_date, assigned_to, assignee_id, completed_at, sort_order')
     .eq('project_id', projectId)
     .order('sort_order', { ascending: true })
 
@@ -88,6 +88,21 @@ async function buildProjectContext(supabase: ReturnType<typeof createClient> ext
     // Table might not exist
   }
 
+  // Fetch team members (profiles + external)
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, role')
+    .in('role', ['admin', 'member'])
+
+  const { data: externalMembers } = await supabase
+    .from('team_members')
+    .select('id, full_name, role')
+
+  const teamMembers = [
+    ...(profiles || []).map(p => ({ ...p, source: 'profile' as const })),
+    ...(externalMembers || []).map(m => ({ ...m, source: 'external' as const })),
+  ]
+
   // Fetch recent activity
   const { data: activity } = await supabase
     .from('activity_feed')
@@ -101,7 +116,7 @@ async function buildProjectContext(supabase: ReturnType<typeof createClient> ext
     id: e.id,
     category: e.category,
     description: e.description,
-    amount: e.cost_pre_tax || 0,
+    amount: Number(e.cost_pre_tax || 0) + Number(e.tax || 0),
     vendor: e.vendor_or_person,
     is_billable: e.is_billable ?? true,
     markup_percent: e.markup_percent || 0,
@@ -154,6 +169,7 @@ async function buildProjectContext(supabase: ReturnType<typeof createClient> ext
       priority: t.priority,
       due_date: t.due_date,
       assigned_to: t.assigned_to,
+      assignee_id: t.assignee_id,
       completed_at: t.completed_at,
       order: t.sort_order || 0,
     })),
@@ -205,6 +221,7 @@ async function buildProjectContext(supabase: ReturnType<typeof createClient> ext
       description: JSON.stringify(a.metadata),
       created_at: a.created_at,
     })),
+    teamMembers,
   }
 }
 

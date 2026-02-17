@@ -17,6 +17,17 @@ export interface TeamMember {
   totalEarned: number
 }
 
+export interface AssignedTask {
+  id: string
+  title: string
+  description?: string
+  status: 'todo' | 'in_progress' | 'review' | 'completed'
+  priority: 'low' | 'medium' | 'high'
+  due_date?: string
+  project_id: string
+  project?: { id: string; name: string }
+}
+
 export interface TeamMemberDetail {
   profile: {
     id: string
@@ -26,6 +37,7 @@ export interface TeamMemberDetail {
     avatar_url: string | null
   }
   laborEntries: LaborEntry[]
+  assignedTasks?: AssignedTask[]
   totals: {
     totalEarned: number
     totalOwed: number

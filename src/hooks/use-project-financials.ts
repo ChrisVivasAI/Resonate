@@ -14,6 +14,7 @@ export interface ProjectFinancials {
     remainingInternalBudget: number
     outstandingInvoices: number
     paidInvoices: number
+    totalInvoiced: number
   }
   expenses: {
     total: number

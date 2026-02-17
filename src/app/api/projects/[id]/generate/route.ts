@@ -26,6 +26,28 @@ export async function POST(
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
+    // Optionally fetch team members if IDs provided
+    const body = await request.json().catch(() => ({}))
+    const { team_member_ids } = body as { team_member_ids?: string[] }
+
+    let teamMembersForPlan: Array<{ id: string; full_name: string; role: string }> | undefined
+    if (team_member_ids && team_member_ids.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .in('id', team_member_ids)
+
+      const { data: externalMembers } = await supabase
+        .from('team_members')
+        .select('id, full_name, role')
+        .in('id', team_member_ids)
+
+      teamMembersForPlan = [
+        ...(profiles || []),
+        ...(externalMembers || []),
+      ]
+    }
+
     // Generate project plan using AI
     const plan = await generateProjectPlan({
       name: project.name,
@@ -35,7 +57,7 @@ export async function POST(
       start_date: project.start_date,
       due_date: project.due_date,
       project_type: project.project_type,
-    })
+    }, teamMembersForPlan)
 
     // Calculate due dates based on project timeline
     const startDate = project.start_date ? new Date(project.start_date) : new Date()
@@ -56,16 +78,31 @@ export async function POST(
     // Validate priority values (database only accepts 'low', 'medium', 'high')
     const validPriorities = ['low', 'medium', 'high']
 
+    // Build a name-to-ID lookup for resolving assigned_to_name from the AI plan
+    const nameToIdMap = new Map<string, string>()
+    if (teamMembersForPlan) {
+      for (const m of teamMembersForPlan) {
+        nameToIdMap.set(m.full_name.toLowerCase(), m.id)
+      }
+    }
+
     // Create tasks with correct column names matching schema
-    const tasksToCreate = plan.tasks.map((task, index) => ({
-      project_id: projectId,
-      title: task.title,
-      description: task.description || '',
-      priority: validPriorities.includes(task.priority) ? task.priority : 'medium',
-      status: 'todo', // Schema uses 'todo', not 'pending'
-      due_date: calculateDueDate(task.estimated_days, task.sort_order || index + 1),
-      sort_order: task.sort_order || index + 1, // Schema uses 'sort_order', not 'order'
-    }))
+    const tasksToCreate = plan.tasks.map((task, index) => {
+      let assigneeId: string | null = null
+      if (task.assigned_to_name && nameToIdMap.size > 0) {
+        assigneeId = nameToIdMap.get(task.assigned_to_name.toLowerCase()) || null
+      }
+      return {
+        project_id: projectId,
+        title: task.title,
+        description: task.description || '',
+        priority: validPriorities.includes(task.priority) ? task.priority : 'medium',
+        status: 'todo', // Schema uses 'todo', not 'pending'
+        due_date: calculateDueDate(task.estimated_days, task.sort_order || index + 1),
+        sort_order: task.sort_order || index + 1, // Schema uses 'sort_order', not 'order'
+        assignee_id: assigneeId,
+      }
+    })
 
     let tasksCreated = 0
     if (tasksToCreate.length > 0) {

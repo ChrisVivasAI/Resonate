@@ -76,10 +76,15 @@ export async function GET(
     const paidInvoices = invoices?.filter(i => i.status === 'paid')
       .reduce((sum, i) => sum + Number(i.total_amount), 0) || 0
 
+    // Total invoiced (non-cancelled) represents what's been charged against the client budget
+    const totalInvoiced = invoices?.filter(i => i.status !== 'cancelled')
+      .reduce((sum, i) => sum + Number(i.total_amount), 0) || 0
+
     const grossProfit = paidInvoices - totalInternalCost
     const profitMargin = paidInvoices > 0 ? (grossProfit / paidInvoices) * 100 : 0
 
-    const remainingBudget = clientBudget - totalClientCharges
+    // Remaining budget uses the greater of invoiced or expense charges to avoid underreporting
+    const remainingBudget = clientBudget - Math.max(totalInvoiced, totalClientCharges)
     const remainingInternalBudget = internalBudgetCap - totalInternalCost
 
     // Expense breakdown by category
@@ -137,6 +142,7 @@ export async function GET(
         remainingInternalBudget,
         outstandingInvoices,
         paidInvoices,
+        totalInvoiced,
       },
       expenses: {
         total: totalExpenseCost,

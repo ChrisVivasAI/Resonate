@@ -58,6 +58,7 @@ export interface Task {
   status: 'todo' | 'in_progress' | 'review' | 'completed'
   priority: 'low' | 'medium' | 'high'
   assigned_to?: string
+  assignee_id?: string
   due_date?: string
   completed_at?: string
   order: number
@@ -312,7 +313,8 @@ export interface DeliverableVersion {
 // Comment Types
 export interface Comment {
   id: string
-  deliverable_id: string
+  deliverable_id?: string
+  task_id?: string
   user_id: string
   parent_id?: string
   content: string
@@ -437,6 +439,7 @@ export type NotificationType =
   | 'health_alert'
   | 'project_update'
   | 'invitation_accepted'
+  | 'task_assigned'
 
 export interface Notification {
   id: string

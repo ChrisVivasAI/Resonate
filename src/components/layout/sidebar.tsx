@@ -12,6 +12,7 @@ import {
   Sparkles,
   MessageSquareText,
   UsersRound,
+  ListTodo,
   Settings,
   LogOut,
   ChevronLeft,
@@ -29,6 +30,7 @@ import { ClientSubNav } from './client-sub-nav'
 // Top-level navigation items (without Projects and Payments - they're now under Clients)
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'My Tasks', href: '/my-tasks', icon: ListTodo },
   { name: 'Clients', href: '/clients', icon: Users, expandable: true },
   { name: 'Team', href: '/team', icon: UsersRound },
   { name: 'Leads', href: '/leads', icon: MessageSquareText },

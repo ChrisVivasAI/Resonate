@@ -14,6 +14,7 @@ import {
   Flag,
   Settings,
   ExternalLink,
+  ListTodo,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Notification } from '@/hooks/use-notifications'
@@ -33,6 +34,7 @@ const notificationIcons: Record<string, React.ComponentType<{ className?: string
   deliverable_ready: Package,
   comment: MessageSquare,
   approval_needed: AlertTriangle,
+  task_assigned: ListTodo,
   settings: Settings,
   default: Bell,
 }
@@ -43,6 +45,7 @@ const notificationColors: Record<string, string> = {
   deliverable_ready: 'bg-[#23FD9E]/10 text-[#23FD9E]',
   comment: 'bg-blue-500/10 text-blue-400',
   approval_needed: 'bg-red-500/10 text-red-400',
+  task_assigned: 'bg-indigo-500/10 text-indigo-400',
   settings: 'bg-white/10 text-white/60',
   default: 'bg-white/10 text-white/60',
 }
