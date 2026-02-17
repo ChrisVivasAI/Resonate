@@ -24,6 +24,8 @@ export interface ProjectFinancials {
   labor: {
     estimatedCost: number
     actualCost: number
+    owed: number
+    paid: number
     count: number
     byRole: Record<string, { estimatedHours: number; actualHours: number; estimatedCost: number; actualCost: number; count: number }>
   }

@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { X } from 'lucide-react'
 import type { LaborInput, BillingType } from '@/hooks/use-labor'
+import { useTeamMembers } from '@/hooks'
 
 interface LaborFormProps {
   projectId: string
@@ -70,7 +71,9 @@ const ROLES = [
 
 export function LaborForm({ projectId, onSubmit, onCancel, initialData, isEdit }: LaborFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { members } = useTeamMembers()
   const [formData, setFormData] = useState({
+    team_member_id: initialData?.team_member_id || '',
     team_member_name: initialData?.team_member_name || '',
     role: initialData?.role || '',
     billing_type: (initialData?.billing_type || 'hourly') as BillingType,
@@ -93,9 +96,11 @@ export function LaborForm({ projectId, onSubmit, onCancel, initialData, isEdit }
     setIsSubmitting(true)
 
     try {
+      const selectedMember = members.find(m => m.id === formData.team_member_id)
       await onSubmit({
         project_id: projectId,
-        team_member_name: formData.team_member_name || undefined,
+        team_member_id: formData.team_member_id || undefined,
+        team_member_name: selectedMember?.full_name || formData.team_member_name || undefined,
         role: formData.role,
         billing_type: formData.billing_type,
         hourly_rate: rate,
@@ -124,11 +129,20 @@ export function LaborForm({ projectId, onSubmit, onCancel, initialData, isEdit }
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Team Member Name"
-              value={formData.team_member_name}
-              onChange={(e) => setFormData({ ...formData, team_member_name: e.target.value })}
-              placeholder="Enter name"
+            <Select
+              label="Team Member"
+              value={formData.team_member_id}
+              onChange={(e) => {
+                const id = e.target.value
+                const member = members.find(m => m.id === id)
+                setFormData({
+                  ...formData,
+                  team_member_id: id,
+                  team_member_name: member?.full_name || '',
+                })
+              }}
+              placeholder="Select team member..."
+              options={members.map((m) => ({ value: m.id, label: m.full_name || m.email }))}
             />
 
             <Select

@@ -11,6 +11,7 @@ import {
   CreditCard,
   Sparkles,
   MessageSquareText,
+  UsersRound,
   Settings,
   LogOut,
   ChevronLeft,
@@ -29,6 +30,7 @@ import { ClientSubNav } from './client-sub-nav'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users, expandable: true },
+  { name: 'Team', href: '/team', icon: UsersRound },
   { name: 'Leads', href: '/leads', icon: MessageSquareText },
   { name: 'AI Studio', href: '/ai-studio', icon: Sparkles, highlight: true },
 ]

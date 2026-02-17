@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Filter, Clock, DollarSign } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Filter, Clock, DollarSign, Check, CircleDollarSign } from 'lucide-react'
 import { useLabor, type LaborEntry, type LaborInput, type BillingType } from '@/hooks'
 
 const BILLING_TYPE_LABELS: Record<string, { badge: string; suffix: string }> = {
@@ -27,7 +27,7 @@ interface LaborTableProps {
 }
 
 export function LaborTable({ projectId }: LaborTableProps) {
-  const { laborEntries, loading, error, totals, addLaborEntry, updateLaborEntry, deleteLaborEntry } = useLabor({
+  const { laborEntries, loading, error, totals, addLaborEntry, updateLaborEntry, deleteLaborEntry, markAsPaid, markAsOwed } = useLabor({
     projectId,
   })
   const [showForm, setShowForm] = useState(false)
@@ -127,6 +127,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
         onSubmit={handleUpdateEntry}
         onCancel={() => setEditingEntry(null)}
         initialData={{
+          team_member_id: editingEntry.team_member_id || undefined,
           team_member_name: editingEntry.team_member_name || undefined,
           role: editingEntry.role,
           billing_type: editingEntry.billing_type || 'hourly',
@@ -246,6 +247,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                         Actual Cost <SortIcon field="actual_cost" />
                       </div>
                     </th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-obsidian-400">Payment</th>
                     <th className="text-right py-3 px-4 text-sm font-medium text-obsidian-400">Actions</th>
                   </tr>
                 </thead>
@@ -288,6 +290,34 @@ export function LaborTable({ projectId }: LaborTableProps) {
                             ${Number(entry.actual_cost).toFixed(2)}
                           </span>
                         </td>
+                        <td className="py-3 px-4 text-center">
+                          {Number(entry.actual_cost) > 0 ? (
+                            entry.payment_status === 'paid' ? (
+                              <button
+                                onClick={() => {
+                                  if (confirm('Mark this entry as unpaid?')) {
+                                    markAsOwed(entry.id)
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                                title="Click to mark as owed"
+                              >
+                                <Check className="w-3 h-3" />
+                                Paid
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => markAsPaid(entry.id)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                              >
+                                <CircleDollarSign className="w-3 h-3" />
+                                Mark Paid
+                              </button>
+                            )
+                          ) : (
+                            <span className="text-obsidian-500">—</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-end gap-2">
                             <button
@@ -315,7 +345,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
 
             {/* Summary section */}
             <div className="mt-6 pt-4 border-t border-obsidian-800">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div className="flex items-center gap-3 p-3 bg-obsidian-800/30 rounded-xl">
                   <Clock className="w-5 h-5 text-ember-400" />
                   <div>
@@ -348,6 +378,20 @@ export function LaborTable({ projectId }: LaborTableProps) {
                     >
                       ${totals.actualCost.toFixed(2)}
                     </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-obsidian-800/30 rounded-xl">
+                  <CircleDollarSign className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <div className="text-xs text-obsidian-400">Total Owed</div>
+                    <div className="text-lg font-semibold text-amber-400">${totals.totalOwed.toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-obsidian-800/30 rounded-xl">
+                  <Check className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <div className="text-xs text-obsidian-400">Total Paid</div>
+                    <div className="text-lg font-semibold text-emerald-400">${totals.totalPaid.toFixed(2)}</div>
                   </div>
                 </div>
               </div>

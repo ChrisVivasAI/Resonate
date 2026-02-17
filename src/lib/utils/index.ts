@@ -35,7 +35,8 @@ export function formatRelativeTime(date: string | Date): string {
   return formatDistanceToNow(d, { addSuffix: true })
 }
 
-export function getInitials(name: string): string {
+export function getInitials(name: string | null | undefined): string {
+  if (!name) return '?'
   return name
     .split(' ')
     .map((n) => n[0])

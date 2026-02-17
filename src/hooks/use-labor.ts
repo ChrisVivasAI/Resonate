@@ -17,6 +17,9 @@ export interface LaborEntry {
   actual_hours: number
   estimated_cost: number
   actual_cost: number
+  payment_status: 'owed' | 'paid'
+  payment_date: string | null
+  payment_method: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -34,6 +37,9 @@ export interface LaborInput {
   estimated_hours?: number
   actual_hours?: number
   notes?: string
+  payment_status?: 'owed' | 'paid'
+  payment_date?: string
+  payment_method?: string
 }
 
 interface UseLaborOptions {
@@ -130,6 +136,46 @@ export function useLabor(options: UseLaborOptions = {}) {
     return data.laborEntry
   }
 
+  const markAsPaid = async (id: string, paymentMethod?: string) => {
+    const response = await fetch(`/api/labor/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        payment_status: 'paid',
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_method: paymentMethod || null,
+      }),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to mark as paid')
+    }
+
+    await fetchLaborEntries()
+    return data.laborEntry
+  }
+
+  const markAsOwed = async (id: string) => {
+    const response = await fetch(`/api/labor/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        payment_status: 'owed',
+        payment_date: null,
+        payment_method: null,
+      }),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to mark as owed')
+    }
+
+    await fetchLaborEntries()
+    return data.laborEntry
+  }
+
   const deleteLaborEntry = async (id: string) => {
     const response = await fetch(`/api/labor/${id}`, {
       method: 'DELETE',
@@ -149,6 +195,8 @@ export function useLabor(options: UseLaborOptions = {}) {
     actualHours: laborEntries.reduce((sum, l) => sum + Number(l.actual_hours), 0),
     estimatedCost: laborEntries.reduce((sum, l) => sum + Number(l.estimated_cost), 0),
     actualCost: laborEntries.reduce((sum, l) => sum + Number(l.actual_cost), 0),
+    totalOwed: laborEntries.filter(l => l.payment_status !== 'paid').reduce((sum, l) => sum + Number(l.actual_cost), 0),
+    totalPaid: laborEntries.filter(l => l.payment_status === 'paid').reduce((sum, l) => sum + Number(l.actual_cost), 0),
     count: laborEntries.length,
   }
 
@@ -161,5 +209,7 @@ export function useLabor(options: UseLaborOptions = {}) {
     addLaborEntry,
     updateLaborEntry,
     deleteLaborEntry,
+    markAsPaid,
+    markAsOwed,
   }
 }

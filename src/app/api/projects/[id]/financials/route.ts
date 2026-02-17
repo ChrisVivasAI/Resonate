@@ -61,6 +61,9 @@ export async function GET(
     const totalLaborCost = laborEntries?.reduce((sum, l) => sum + Number(l.actual_cost || 0), 0) || 0
     const totalEstimatedLaborCost = laborEntries?.reduce((sum, l) => sum + Number(l.estimated_cost || 0), 0) || 0
 
+    const totalLaborOwed = laborEntries?.filter(l => l.payment_status !== 'paid').reduce((sum, l) => sum + Number(l.actual_cost || 0), 0) || 0
+    const totalLaborPaid = laborEntries?.filter(l => l.payment_status === 'paid').reduce((sum, l) => sum + Number(l.actual_cost || 0), 0) || 0
+
     const totalInternalCost = totalExpenseCost + totalLaborCost
     const totalClientCharges = totalExpenseClientCharges
 
@@ -144,6 +147,8 @@ export async function GET(
       labor: {
         estimatedCost: totalEstimatedLaborCost,
         actualCost: totalLaborCost,
+        owed: totalLaborOwed,
+        paid: totalLaborPaid,
         count: laborEntries?.length || 0,
         byRole: laborByRole,
       },

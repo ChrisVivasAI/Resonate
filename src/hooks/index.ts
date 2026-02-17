@@ -50,3 +50,6 @@ export type { ClientNavItem } from './use-client-navigation'
 
 export { useInvoices } from './use-invoices'
 export type { InvoiceInput, StripeInvoicePreview } from './use-invoices'
+
+export { useTeamMembers, useTeamMember } from './use-team-member'
+export type { TeamMember, TeamMemberDetail } from './use-team-member'
