@@ -49,19 +49,60 @@ export async function PATCH(
 
     const body = await request.json()
 
-    // If status is being changed to 'completed', set return_completed_date
-    if (body.status === 'completed' && !body.return_completed_date) {
-      body.return_completed_date = new Date().toISOString().split('T')[0]
+    // Whitelist allowed fields
+    const allowedFields = ['description', 'status', 'net_return', 'restocking_fee', 'return_completed_date', 'refund_received_date', 'notes', 'tracking_number', 'vendor']
+    const updates: Record<string, unknown> = {}
+    for (const key of allowedFields) {
+      if (key in body) updates[key] = body[key]
+    }
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
-    // If refund_received_date is set, update status to completed
-    if (body.refund_received_date && !body.status) {
-      body.status = 'completed'
+    // If status is being changed to 'completed', set return_completed_date
+    if (updates.status === 'completed' && !updates.return_completed_date) {
+      updates.return_completed_date = new Date().toISOString().split('T')[0]
+    }
+
+    // If refund_received_date is set, only auto-complete if current status is 'in_progress'
+    if (updates.refund_received_date && !updates.status) {
+      const { data: current } = await supabase
+        .from('returns')
+        .select('status')
+        .eq('id', id)
+        .single()
+      if (current?.status === 'in_progress') {
+        updates.status = 'completed'
+        if (!updates.return_completed_date) {
+          updates.return_completed_date = new Date().toISOString().split('T')[0]
+        }
+      }
+    }
+
+    // Status transition validation
+    if (updates.status) {
+      const { data: current } = await supabase
+        .from('returns')
+        .select('status')
+        .eq('id', id)
+        .single()
+      const validTransitions: Record<string, string[]> = {
+        pending: ['in_progress', 'cancelled'],
+        in_progress: ['completed', 'cancelled'],
+        completed: [],
+        cancelled: [],
+      }
+      if (current && !validTransitions[current.status]?.includes(updates.status as string)) {
+        return NextResponse.json(
+          { error: `Cannot transition from '${current.status}' to '${updates.status}'` },
+          { status: 400 }
+        )
+      }
     }
 
     const { data: returnEntry, error } = await supabase
       .from('returns')
-      .update(body)
+      .update(updates)
       .eq('id', id)
       .select()
       .single()
@@ -91,6 +132,19 @@ export async function DELETE(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Prevent deletion of in-progress or completed returns
+    const { data: current } = await supabase
+      .from('returns')
+      .select('status')
+      .eq('id', id)
+      .single()
+    if (current && ['completed', 'in_progress'].includes(current.status)) {
+      return NextResponse.json(
+        { error: 'Cannot delete a return that is in progress or completed' },
+        { status: 400 }
+      )
     }
 
     const { error } = await supabase

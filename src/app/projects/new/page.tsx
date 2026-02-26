@@ -277,10 +277,10 @@ export default function NewProjectPage() {
               </div>
             </Card>
 
-            {/* Timeline & Budget */}
+            {/* Timeline & Quote */}
             <Card className="p-6">
               <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider mb-4">
-                Timeline & Budget
+                Timeline & Quote
               </h3>
 
               <div className="grid grid-cols-3 gap-4">
@@ -313,7 +313,7 @@ export default function NewProjectPage() {
                 <div>
                   <label className="block text-sm font-medium text-white/60 mb-2">
                     <DollarSign className="w-4 h-4 inline mr-2" />
-                    Budget
+                    Quote
                   </label>
                   <input
                     type="number"
@@ -327,7 +327,7 @@ export default function NewProjectPage() {
                 </div>
               </div>
 
-              {/* Deposit percentage — shown when budget > 0 and client selected */}
+              {/* Deposit percentage — shown when quote > 0 and client selected */}
               {formData.budget && parseFloat(formData.budget) > 0 && formData.client_id && (
                 <div className="mt-4 space-y-3">
                   <div className="max-w-xs">

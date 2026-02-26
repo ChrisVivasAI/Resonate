@@ -4,14 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 
 export interface ProjectFinancials {
   summary: {
-    clientBudget: number
-    internalBudgetCap: number
+    quoteAmount: number
     totalClientCharges: number
     totalInternalCost: number
     grossProfit: number
     profitMargin: number
     remainingBudget: number
-    remainingInternalBudget: number
     outstandingInvoices: number
     paidInvoices: number
     totalInvoiced: number

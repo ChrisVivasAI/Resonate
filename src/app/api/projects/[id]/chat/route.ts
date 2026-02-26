@@ -272,7 +272,7 @@ function formatToolResultsMessage(executedResults: { call_id: string; result: un
         lines.push(`- **Status:** ${data.status} — **Progress:** ${data.progress}%`)
         if (tasks) lines.push(`- **Tasks:** ${tasks.completed}/${tasks.total} completed${tasks.overdue > 0 ? ` (${tasks.overdue} overdue)` : ''}`)
         if (milestones) lines.push(`- **Milestones:** ${milestones.completed}/${milestones.total} completed`)
-        if (budget) lines.push(`- **Budget:** $${budget.spent.toLocaleString()} spent of $${budget.total.toLocaleString()} ($${budget.remaining.toLocaleString()} remaining)`)
+        if (budget) lines.push(`- **Quote:** $${budget.spent.toLocaleString()} spent of $${budget.total.toLocaleString()} ($${budget.remaining.toLocaleString()} remaining)`)
         parts.push(lines.join('\n'))
         break
       }
@@ -294,11 +294,11 @@ function formatToolResultsMessage(executedResults: { call_id: string; result: un
 
       case 'get_financial_summary': {
         const lines: string[] = ['**Financial Summary:**']
-        lines.push(`- **Budget:** $${(data.budget as number || 0).toLocaleString()}`)
-        lines.push(`- **Total Spent:** $${(data.total_spent as number || 0).toLocaleString()} (${data.budget_utilization || 'N/A'})`)
+        lines.push(`- **Quote:** $${(data.quote as number || 0).toLocaleString()}`)
+        lines.push(`- **Total Spent:** $${(data.total_spent as number || 0).toLocaleString()} (${data.quote_utilization || 'N/A'})`)
         lines.push(`- **Expenses:** $${(data.total_expenses as number || 0).toLocaleString()}`)
         lines.push(`- **Labor:** $${(data.total_labor as number || 0).toLocaleString()}`)
-        lines.push(`- **Remaining:** $${(data.remaining_budget as number || 0).toLocaleString()}`)
+        lines.push(`- **Remaining:** $${(data.remaining_on_quote as number || 0).toLocaleString()}`)
         if ((data.pending_reimbursements as number) > 0) lines.push(`- **Pending Reimbursements:** $${(data.pending_reimbursements as number).toLocaleString()}`)
         if ((data.pending_returns as number) > 0) lines.push(`- **Pending Returns:** $${(data.pending_returns as number).toLocaleString()}`)
         parts.push(lines.join('\n'))

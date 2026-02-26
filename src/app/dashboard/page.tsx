@@ -2,8 +2,6 @@
 
 import { motion } from 'framer-motion'
 import {
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   FolderKanban,
   Users,
@@ -26,41 +24,53 @@ export default function DashboardPage() {
 
   const userName = profile?.full_name?.split(' ')[0] || profile?.email?.split('@')[0] || 'there'
 
+  const revenueDescription = stats.revenueChange > 0
+    ? `+${stats.revenueChange.toFixed(1)}% vs last month`
+    : stats.revenueChange < 0
+    ? `${stats.revenueChange.toFixed(1)}% vs last month`
+    : 'vs last month'
+
+  const revenueDescriptionColor = stats.revenueChange > 0
+    ? 'text-green-400'
+    : stats.revenueChange < 0
+    ? 'text-red-400'
+    : 'text-charcoal-600'
+
+  const clientsDescription = stats.newClientsThisMonth > 0
+    ? `+${stats.newClientsThisMonth} new this month`
+    : 'total'
+
   const dashboardStats = [
     {
       name: 'REVENUE',
-      value: formatCurrency(stats.totalRevenue),
-      change: '+12.5%',
-      trend: 'up',
+      value: formatCurrency(stats.thisMonthRevenue),
       icon: DollarSign,
-      description: 'vs last month',
+      description: revenueDescription,
+      descriptionColor: revenueDescriptionColor,
       accent: true,
     },
     {
       name: 'PROJECTS',
       value: stats.activeProjects.toString(),
-      change: '+3',
-      trend: 'up',
       icon: FolderKanban,
       description: 'in progress',
+      descriptionColor: 'text-charcoal-600',
       accent: false,
     },
     {
       name: 'CLIENTS',
       value: stats.totalClients.toString(),
-      change: '+2',
-      trend: 'up',
       icon: Users,
-      description: 'total',
+      description: clientsDescription,
+      descriptionColor: 'text-charcoal-600',
       accent: false,
     },
     {
       name: 'COMPLETED',
       value: stats.completedThisMonth.toString(),
-      change: '+' + stats.completedThisMonth,
-      trend: 'up',
       icon: CheckCircle2,
       description: 'this month',
+      descriptionColor: 'text-charcoal-600',
       accent: false,
     },
   ]
@@ -134,18 +144,8 @@ export default function DashboardPage() {
                     <p className={`text-2xl font-medium tracking-tight ${stat.accent ? 'text-white' : 'text-white'}`}>
                       {stat.value}
                     </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`inline-flex items-center gap-1 text-xs ${
-                        stat.trend === 'up' ? 'text-resonate-400' : 'text-red-400'
-                      }`}>
-                        {stat.trend === 'up' ? (
-                          <TrendingUp className="w-3 h-3" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3" />
-                        )}
-                        {stat.change}
-                      </span>
-                      <span className="text-[10px] text-charcoal-600">{stat.description}</span>
+                    <div className="mt-2">
+                      <span className={`text-[10px] ${stat.descriptionColor}`}>{stat.description}</span>
                     </div>
                   </div>
                   <div className={`p-2.5 rounded-md transition-colors duration-300 ${
@@ -229,6 +229,7 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Progress bar */}
+                        {(project.progress > 0 || project.status === 'completed') && (
                         <div className="mb-3">
                           <div className="flex items-center justify-between text-[10px] mb-1.5">
                             <span className="text-charcoal-500 uppercase tracking-[0.1em]">Progress</span>
@@ -249,6 +250,7 @@ export default function DashboardPage() {
                             />
                           </div>
                         </div>
+                        )}
 
                         {/* Footer info */}
                         <div className="flex items-center justify-between text-[10px]">

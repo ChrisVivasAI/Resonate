@@ -384,11 +384,11 @@ const AGENT_TOOLS = {
   // Project Update
   update_project: {
     name: 'update_project',
-    description: 'Update project details like budget, dates, status, or description',
+    description: 'Update project details like quote, dates, status, or description',
     parameters: {
       type: 'object',
       properties: {
-        budget: { type: 'number', description: 'New budget amount' },
+        budget: { type: 'number', description: 'New quote amount' },
         start_date: { type: 'string', description: 'New start date (YYYY-MM-DD)' },
         due_date: { type: 'string', description: 'New due date (YYYY-MM-DD)' },
         status: { type: 'string', enum: ['draft', 'in_progress', 'review', 'completed', 'cancelled'], description: 'New status' },
@@ -437,12 +437,12 @@ const AGENT_TOOLS = {
   // Historical Data Access
   get_similar_projects: {
     name: 'get_similar_projects',
-    description: 'Find similar past completed projects based on budget range or tags to help with planning and estimation',
+    description: 'Find similar past completed projects based on quote range or tags to help with planning and estimation',
     parameters: {
       type: 'object',
       properties: {
-        budget_min: { type: 'number', description: 'Minimum budget to filter by' },
-        budget_max: { type: 'number', description: 'Maximum budget to filter by' },
+        budget_min: { type: 'number', description: 'Minimum quote to filter by' },
+        budget_max: { type: 'number', description: 'Maximum quote to filter by' },
         tags: { type: 'array', items: { type: 'string' }, description: 'Tags to filter by (e.g., branding, video, website)' },
         limit: { type: 'number', description: 'Max number of results (default 5)' },
       },
@@ -490,7 +490,7 @@ const AGENT_TOOLS = {
 
   get_financial_summary: {
     name: 'get_financial_summary',
-    description: 'Get detailed financial breakdown including expenses, labor costs, and budget status',
+    description: 'Get detailed financial breakdown including expenses, labor costs, and quote status',
     parameters: {
       type: 'object',
       properties: {},
@@ -542,7 +542,7 @@ function buildSystemPrompt(context: ProjectContext): string {
 **Status:** ${context.project.status}
 **Priority:** ${context.project.priority}
 **Progress:** ${context.project.progress}%
-**Budget:** $${context.project.budget.toLocaleString()}
+**Quote:** $${context.project.budget.toLocaleString()}
 **Timeline:** ${context.project.start_date || 'Not set'} to ${context.project.due_date || 'Not set'}
 
 **Description:** ${context.project.description || 'No description provided'}
@@ -568,10 +568,10 @@ ${context.deliverables.length > 0
     : 'No deliverables yet'}
 
 ## Financial Summary
-- Budget: $${context.financials.budget.toLocaleString()}
+- Quote: $${context.financials.budget.toLocaleString()}
 - Total Expenses: $${context.financials.totalExpenses.toLocaleString()}
 - Total Labor: $${context.financials.totalLabor.toLocaleString()}
-- Remaining Budget: $${context.financials.remainingBudget.toLocaleString()}
+- Remaining on Quote: $${context.financials.remainingBudget.toLocaleString()}
 - Pending Reimbursements: $${context.financials.reimbursementsPending.toLocaleString()}
 - Pending Returns: $${context.financials.returnsPending.toLocaleString()}
 
@@ -594,7 +594,7 @@ ${context.financials.laborEntries && context.financials.laborEntries.length > 0
 - For financial questions, always reference actual data from the context
 - You have full access to modify project data: tasks, milestones, deliverables, expenses, labor entries, and project settings
 - When updating or deleting items, always reference them by their ID shown in brackets above
-- Use historical data tools (get_similar_projects, get_historical_pricing) to provide informed recommendations for budgets and timelines`
+- Use historical data tools (get_similar_projects, get_historical_pricing) to provide informed recommendations for quotes and timelines`
 }
 
 // =====================================================
@@ -812,7 +812,7 @@ export async function generateProjectPlan(
 **Project Name:** ${projectInfo.name}
 **Description:** ${projectInfo.description || 'A creative project requiring planning and execution'}
 **Client:** ${projectInfo.client_name || 'Not specified'}
-**Budget:** ${projectInfo.budget ? `$${projectInfo.budget.toLocaleString()}` : 'Not specified'}
+**Quote:** ${projectInfo.budget ? `$${projectInfo.budget.toLocaleString()}` : 'Not specified'}
 **Timeline:** ${projectInfo.start_date || 'Not specified'} to ${projectInfo.due_date || 'Not specified'} (approximately ${projectDurationDays} days)
 **Type:** ${projectInfo.project_type || 'Creative project'}
 ${team_members && team_members.length > 0
@@ -825,7 +825,7 @@ STRICT REQUIREMENTS:
 - deliverables.type MUST be one of: "image", "video", "audio", "document", "text"
 - estimated_days should be cumulative from project start (e.g., task at day 5, milestone at day 14)
 - sort_order should be sequential starting from 1
-- Budget breakdown should sum to approximately the project budget if specified
+- Quote breakdown should sum to approximately the project quote if specified
 - Generate 5-10 tasks, 3-5 milestones, 3-6 deliverables based on project scope
 
 Respond with ONLY a valid JSON object (no markdown, no explanation) following this EXACT structure:

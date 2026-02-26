@@ -17,7 +17,7 @@ export async function GET(
     // Get project details
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, name, budget, internal_budget_cap')
+      .select('id, name, budget')
       .eq('id', projectId)
       .single()
 
@@ -26,34 +26,39 @@ export async function GET(
     }
 
     // Get all expenses for the project
-    const { data: expenses } = await supabase
+    const { data: expenses, error: expensesError } = await supabase
       .from('expenses')
       .select('*')
       .eq('project_id', projectId)
+    if (expensesError) throw new Error(`Failed to fetch expenses: ${expensesError.message}`)
 
     // Get all labor entries for the project
-    const { data: laborEntries } = await supabase
+    const { data: laborEntries, error: laborError } = await supabase
       .from('labor_entries')
       .select('*')
       .eq('project_id', projectId)
+    if (laborError) throw new Error(`Failed to fetch labor entries: ${laborError.message}`)
 
     // Get all invoices for the project
-    const { data: invoices } = await supabase
+    const { data: invoices, error: invoicesError } = await supabase
       .from('invoices')
       .select('*')
       .eq('project_id', projectId)
+    if (invoicesError) throw new Error(`Failed to fetch invoices: ${invoicesError.message}`)
 
     // Get all reimbursements for the project
-    const { data: reimbursements } = await supabase
+    const { data: reimbursements, error: reimbursementsError } = await supabase
       .from('reimbursements')
       .select('*')
       .eq('project_id', projectId)
+    if (reimbursementsError) throw new Error(`Failed to fetch reimbursements: ${reimbursementsError.message}`)
 
     // Get all returns for the project
-    const { data: returns } = await supabase
+    const { data: returns, error: returnsError } = await supabase
       .from('returns')
       .select('*')
       .eq('project_id', projectId)
+    if (returnsError) throw new Error(`Failed to fetch returns: ${returnsError.message}`)
 
     // Calculate totals
     const totalExpenseCost = expenses?.reduce((sum, e) => sum + Number(e.total || 0), 0) || 0
@@ -65,10 +70,9 @@ export async function GET(
     const totalLaborPaid = laborEntries?.filter(l => l.payment_status === 'paid').reduce((sum, l) => sum + Number(l.actual_cost || 0), 0) || 0
 
     const totalInternalCost = totalExpenseCost + totalLaborCost
-    const totalClientCharges = totalExpenseClientCharges
+    const totalClientCharges = totalExpenseClientCharges + totalLaborCost
 
     const clientBudget = Number(project.budget) || 0
-    const internalBudgetCap = Number(project.internal_budget_cap) || 0
 
     const outstandingInvoices = invoices?.filter(i => ['sent', 'overdue'].includes(i.status))
       .reduce((sum, i) => sum + Number(i.total_amount), 0) || 0
@@ -80,12 +84,29 @@ export async function GET(
     const totalInvoiced = invoices?.filter(i => i.status !== 'cancelled')
       .reduce((sum, i) => sum + Number(i.total_amount), 0) || 0
 
-    const grossProfit = paidInvoices - totalInternalCost
+    // Reimbursement totals
+    const reimbursementsPending = reimbursements?.filter(r => r.status === 'pending')
+      .reduce((sum, r) => sum + Number(r.amount), 0) || 0
+    const reimbursementsApproved = reimbursements?.filter(r => r.status === 'approved')
+      .reduce((sum, r) => sum + Number(r.amount), 0) || 0
+    const reimbursementsPaid = reimbursements?.filter(r => r.status === 'paid')
+      .reduce((sum, r) => sum + Number(r.amount), 0) || 0
+    const reimbursementsTotal = reimbursements?.reduce((sum, r) => sum + Number(r.amount), 0) || 0
+
+    // Returns totals
+    const returnsPending = returns?.filter(r => ['pending', 'in_progress'].includes(r.status))
+      .reduce((sum, r) => sum + Number(r.net_return || 0), 0) || 0
+    const returnsCompleted = returns?.filter(r => r.status === 'completed')
+      .reduce((sum, r) => sum + Number(r.net_return || 0), 0) || 0
+    const returnsExpected = returns?.reduce((sum, r) => sum + Number(r.net_return || 0), 0) || 0
+    const restockingFees = returns?.reduce((sum, r) => sum + Number(r.restocking_fee || 0), 0) || 0
+
+    const adjustedInternalCost = totalInternalCost - returnsCompleted + reimbursementsPaid
+    const grossProfit = paidInvoices - adjustedInternalCost
     const profitMargin = paidInvoices > 0 ? (grossProfit / paidInvoices) * 100 : 0
 
     // Remaining budget uses the greater of invoiced or expense charges to avoid underreporting
     const remainingBudget = clientBudget - Math.max(totalInvoiced, totalClientCharges)
-    const remainingInternalBudget = internalBudgetCap - totalInternalCost
 
     // Expense breakdown by category
     const expensesByCategory = expenses?.reduce((acc, e) => {
@@ -113,33 +134,15 @@ export async function GET(
       return acc
     }, {} as Record<string, { estimatedHours: number; actualHours: number; estimatedCost: number; actualCost: number; count: number }>) || {}
 
-    // Reimbursement totals
-    const reimbursementsPending = reimbursements?.filter(r => r.status === 'pending')
-      .reduce((sum, r) => sum + Number(r.amount), 0) || 0
-    const reimbursementsApproved = reimbursements?.filter(r => r.status === 'approved')
-      .reduce((sum, r) => sum + Number(r.amount), 0) || 0
-    const reimbursementsPaid = reimbursements?.filter(r => r.status === 'paid')
-      .reduce((sum, r) => sum + Number(r.amount), 0) || 0
-    const reimbursementsTotal = reimbursements?.reduce((sum, r) => sum + Number(r.amount), 0) || 0
-
-    // Returns totals
-    const returnsPending = returns?.filter(r => ['pending', 'in_progress'].includes(r.status))
-      .reduce((sum, r) => sum + Number(r.net_return || 0), 0) || 0
-    const returnsCompleted = returns?.filter(r => r.status === 'completed')
-      .reduce((sum, r) => sum + Number(r.net_return || 0), 0) || 0
-    const returnsExpected = returns?.reduce((sum, r) => sum + Number(r.net_return || 0), 0) || 0
-    const restockingFees = returns?.reduce((sum, r) => sum + Number(r.restocking_fee || 0), 0) || 0
-
     return NextResponse.json({
       summary: {
-        clientBudget,
-        internalBudgetCap,
+        quoteAmount: clientBudget,
         totalClientCharges,
         totalInternalCost,
+        adjustedInternalCost,
         grossProfit,
         profitMargin: Math.round(profitMargin * 10) / 10,
         remainingBudget,
-        remainingInternalBudget,
         outstandingInvoices,
         paidInvoices,
         totalInvoiced,
@@ -159,7 +162,7 @@ export async function GET(
         byRole: laborByRole,
       },
       invoices: {
-        total: invoices?.reduce((sum, i) => sum + Number(i.total_amount), 0) || 0,
+        total: invoices?.filter(i => i.status !== 'cancelled').reduce((sum, i) => sum + Number(i.total_amount), 0) || 0,
         outstanding: outstandingInvoices,
         paid: paidInvoices,
         count: invoices?.length || 0,

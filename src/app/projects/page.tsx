@@ -221,7 +221,7 @@ export default function ProjectsPage() {
                     <th className="text-left py-4 px-4 text-[10px] font-medium text-charcoal-500 uppercase tracking-[0.1em]">Client</th>
                     <th className="text-left py-4 px-4 text-[10px] font-medium text-charcoal-500 uppercase tracking-[0.1em]">Status</th>
                     <th className="text-left py-4 px-4 text-[10px] font-medium text-charcoal-500 uppercase tracking-[0.1em]">Progress</th>
-                    <th className="text-left py-4 px-4 text-[10px] font-medium text-charcoal-500 uppercase tracking-[0.1em]">Budget</th>
+                    <th className="text-left py-4 px-4 text-[10px] font-medium text-charcoal-500 uppercase tracking-[0.1em]">Quote</th>
                     <th className="text-left py-4 px-4 text-[10px] font-medium text-charcoal-500 uppercase tracking-[0.1em]">Due Date</th>
                     <th className="text-right py-4 px-4"></th>
                   </tr>

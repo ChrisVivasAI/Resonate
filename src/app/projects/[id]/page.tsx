@@ -50,17 +50,22 @@ import { ProjectChat } from '@/components/chat'
 import { formatCurrency, formatDate, getStatusColor, getPriorityColor, cn } from '@/lib/utils'
 import Link from 'next/link'
 
-type TabType = 'overview' | 'tasks' | 'milestones' | 'deliverables' | 'financials' | 'health' | 'activity'
+type TabType = 'overview' | 'work' | 'financials' | 'health-activity'
 
 const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'overview', label: 'Overview', icon: FileText },
-  { id: 'tasks', label: 'Tasks', icon: ListTodo },
-  { id: 'milestones', label: 'Milestones', icon: Flag },
-  { id: 'deliverables', label: 'Deliverables', icon: Package },
+  { id: 'work', label: 'Work', icon: ListTodo },
   { id: 'financials', label: 'Financials', icon: Wallet },
-  { id: 'health', label: 'Health', icon: Activity },
-  { id: 'activity', label: 'Activity', icon: MessageSquare },
+  { id: 'health-activity', label: 'Health & Activity', icon: Activity },
 ]
+
+const legacyTabMap: Record<string, TabType> = {
+  tasks: 'work',
+  milestones: 'work',
+  deliverables: 'work',
+  health: 'health-activity',
+  activity: 'health-activity',
+}
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -723,7 +728,7 @@ export default function ProjectDetailPage() {
                     <DollarSign className="w-5 h-5 text-cyan-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-white/40 uppercase tracking-wider">Budget</p>
+                    <p className="text-xs text-white/40 uppercase tracking-wider">Quote</p>
                     <p className="text-xl font-bold text-white">{formatCurrency(project.budget)}</p>
                   </div>
                 </div>
@@ -771,7 +776,7 @@ export default function ProjectDetailPage() {
               <Card className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-medium text-white/60 uppercase tracking-wider">Health Status</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setActiveTab('health')}>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveTab('health-activity')}>
                     View Details
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
@@ -861,7 +866,7 @@ export default function ProjectDetailPage() {
                       Overdue items
                     </span>
                     <span className="px-2 py-1 text-xs bg-obsidian-700/50 text-white/60 rounded-full">
-                      Budget status
+                      Quote status
                     </span>
                   </div>
                 </div>
@@ -870,252 +875,345 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {activeTab === 'tasks' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white">Tasks</h2>
-              <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddTask}>
-                Add Task
-              </Button>
-            </div>
-            {tasks.length === 0 ? (
-              <Card className="p-8 text-center">
-                <ListTodo className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">No Tasks Yet</h3>
-                <p className="text-white/40 text-sm mb-4">Add tasks to track work on this project.</p>
-                <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAddTask}>Create First Task</Button>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {tasks.map((task) => (
-                  <Card key={task.id} className="group hover:border-white/10 transition-colors">
-                    <div className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleToggleTaskStatus(task)}
-                            className={cn(
-                              'w-5 h-5 rounded border-2 flex items-center justify-center transition-all',
-                              task.status === 'completed'
-                                ? 'bg-[#23FD9E] border-[#23FD9E]'
-                                : 'border-white/20 hover:border-[#23FD9E]/50'
-                            )}
-                          >
-                            {task.status === 'completed' && (
-                              <Check className="w-3 h-3 text-[#1a1a1a]" />
-                            )}
-                          </button>
-                          <div>
-                            <button
-                              onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                              className={cn(
-                                'font-medium text-left hover:text-[#23FD9E] transition-colors',
-                                task.status === 'completed' ? 'text-white/40 line-through' : 'text-white'
-                              )}
-                            >
-                              {task.title}
-                            </button>
-                            {task.description && expandedTaskId !== task.id && (
-                              <p className="text-sm text-white/40 line-clamp-1">{task.description}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {task.assignee_id && teamMembers && (
-                            <span className="text-sm text-white/50">
-                              {teamMembers.find(m => m.id === task.assignee_id)?.full_name || 'Assigned'}
-                            </span>
-                          )}
-                          {task.due_date && (
-                            <span className={cn(
-                              'text-sm',
-                              new Date(task.due_date) < new Date() && task.status !== 'completed'
-                                ? 'text-red-400'
-                                : 'text-white/40'
-                            )}>
-                              {formatDate(task.due_date, 'MMM d')}
-                            </span>
-                          )}
-                          <Badge className={getPriorityColor(task.priority)}>
-                            {task.priority}
-                          </Badge>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => openEditTask(task)}
-                              className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                              title="Edit task"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTask(task.id)}
-                              disabled={deletingTaskId === task.id}
-                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
-                              title="Delete task"
-                            >
-                              {deletingTaskId === task.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {expandedTaskId === task.id && (
-                      <div className="px-4 pb-4 pt-0 border-t border-white/[0.06] mt-0">
-                        <div className="pt-3 space-y-4">
-                          {task.description && (
-                            <p className="text-sm text-white/60">{task.description}</p>
-                          )}
-                          <TaskComments taskId={task.id} />
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'milestones' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white">Milestones</h2>
-              <div className="flex items-center gap-2">
-                {project.budget && project.budget > 0 && project.client_id && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleGenerateInvoices}
-                    disabled={invoiceActionLoading === 'generate'}
-                    leftIcon={invoiceActionLoading === 'generate' ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
-                  >
-                    Generate Invoices
-                  </Button>
-                )}
-                <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddMilestone}>
-                  Add Milestone
+        {activeTab === 'work' && (
+          <div className="space-y-8">
+            {/* Tasks Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <ListTodo className="w-5 h-5" />
+                  Tasks ({tasks.length})
+                </h2>
+                <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddTask}>
+                  Add Task
                 </Button>
               </div>
-            </div>
-            {milestones.length === 0 ? (
-              <Card className="p-8 text-center">
-                <Flag className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">No Milestones Yet</h3>
-                <p className="text-white/40 text-sm mb-4">Add milestones to track key deliverables.</p>
-                <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAddMilestone}>Create First Milestone</Button>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {milestones.map((milestone) => {
-                  const isCompleted = !!milestone.completed_at
-                  return (
-                    <Card key={milestone.id} className="p-5 group hover:border-white/10 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-4">
-                          <button
-                            onClick={() => handleToggleMilestoneStatus(milestone)}
-                            className={cn(
-                              'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
-                              isCompleted
-                                ? 'bg-[#23FD9E]/10 hover:bg-[#23FD9E]/20'
-                                : 'bg-violet-500/10 hover:bg-violet-500/20'
-                            )}
-                          >
-                            {isCompleted ? (
-                              <CheckCircle2 className="w-5 h-5 text-[#23FD9E]" />
-                            ) : (
-                              <Flag className="w-5 h-5 text-violet-400" />
-                            )}
-                          </button>
-                          <div>
-                            <h4 className={cn(
-                              'font-medium',
-                              isCompleted ? 'text-white/60 line-through' : 'text-white'
-                            )}>
-                              {milestone.title}
-                            </h4>
-                            {milestone.description && (
-                              <p className="text-sm text-white/40 mt-1">{milestone.description}</p>
-                            )}
-                            {milestone.payment_amount && milestone.payment_amount > 0 && (
-                              <div className="flex items-center gap-2 mt-2">
-                                <div className="flex items-center gap-1 text-sm text-[#23FD9E]">
-                                  <DollarSign className="w-3.5 h-3.5" />
-                                  <span>{formatCurrency(milestone.payment_amount)}</span>
-                                </div>
-                                {(() => {
-                                  const inv = milestoneInvoiceMap.get(milestone.id)
-                                  if (inv) {
-                                    return (
-                                      <div className="flex items-center gap-1.5">
-                                        <Badge className={
-                                          inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 text-xs' :
-                                          inv.status === 'sent' ? 'bg-blue-500/10 text-blue-400 text-xs' :
-                                          inv.status === 'overdue' ? 'bg-red-500/10 text-red-400 text-xs' :
-                                          inv.status === 'cancelled' ? 'bg-white/10 text-white/40 text-xs' :
-                                          'bg-white/10 text-white/60 text-xs'
-                                        }>
-                                          {inv.invoice_number} &middot; {inv.status}
-                                        </Badge>
-                                        {inv.status === 'draft' && (
-                                          <button
-                                            onClick={() => handleSendMilestoneInvoice(inv.id)}
-                                            disabled={invoiceActionLoading === inv.id}
-                                            className="p-1 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
-                                            title="Send Invoice"
-                                          >
-                                            {invoiceActionLoading === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                                          </button>
-                                        )}
-                                        {inv.stripe_invoice_url && (
-                                          <a href={inv.stripe_invoice_url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-white/[0.06] text-white/40 transition-colors" title="View on Stripe">
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                          </a>
-                                        )}
-                                      </div>
-                                    )
-                                  }
-                                  return null
-                                })()}
-                              </div>
-                            )}
+              {tasks.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <ListTodo className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-white mb-2">No Tasks Yet</h3>
+                  <p className="text-white/40 text-sm mb-4">Add tasks to track work on this project.</p>
+                  <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAddTask}>Create First Task</Button>
+                </Card>
+              ) : (
+                <div className="space-y-2">
+                  {tasks.map((task) => (
+                    <Card key={task.id} className="group hover:border-white/10 transition-colors">
+                      <div className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleToggleTaskStatus(task)}
+                              className={cn(
+                                'w-5 h-5 rounded border-2 flex items-center justify-center transition-all',
+                                task.status === 'completed'
+                                  ? 'bg-[#23FD9E] border-[#23FD9E]'
+                                  : 'border-white/20 hover:border-[#23FD9E]/50'
+                              )}
+                            >
+                              {task.status === 'completed' && (
+                                <Check className="w-3 h-3 text-[#1a1a1a]" />
+                              )}
+                            </button>
+                            <div>
+                              <button
+                                onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                                className={cn(
+                                  'font-medium text-left hover:text-[#23FD9E] transition-colors',
+                                  task.status === 'completed' ? 'text-white/40 line-through' : 'text-white'
+                                )}
+                              >
+                                {task.title}
+                              </button>
+                              {task.description && expandedTaskId !== task.id && (
+                                <p className="text-sm text-white/40 line-clamp-1">{task.description}</p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="text-right">
-                            <Badge className={isCompleted ? 'bg-[#23FD9E]/10 text-[#23FD9E]' : 'bg-amber-500/10 text-amber-400'}>
-                              {isCompleted ? 'Completed' : 'Pending'}
-                            </Badge>
-                            {milestone.due_date && (
-                              <p className={cn(
-                                'text-sm mt-2',
-                                !isCompleted && new Date(milestone.due_date) < new Date()
+                          <div className="flex items-center gap-3">
+                            {task.assignee_id && teamMembers && (
+                              <span className="text-sm text-white/50">
+                                {teamMembers.find(m => m.id === task.assignee_id)?.full_name || 'Assigned'}
+                              </span>
+                            )}
+                            {task.due_date && (
+                              <span className={cn(
+                                'text-sm',
+                                new Date(task.due_date) < new Date() && task.status !== 'completed'
                                   ? 'text-red-400'
                                   : 'text-white/40'
                               )}>
-                                Due {formatDate(milestone.due_date, 'MMM d, yyyy')}
-                              </p>
+                                {formatDate(task.due_date, 'MMM d')}
+                              </span>
                             )}
+                            <Badge className={getPriorityColor(task.priority)}>
+                              {task.priority}
+                            </Badge>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => openEditTask(task)}
+                                className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                                title="Edit task"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTask(task.id)}
+                                disabled={deletingTaskId === task.id}
+                                className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
+                                title="Delete task"
+                              >
+                                {deletingTaskId === task.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {expandedTaskId === task.id && (
+                        <div className="px-4 pb-4 pt-0 border-t border-white/[0.06] mt-0">
+                          <div className="pt-3 space-y-4">
+                            {task.description && (
+                              <p className="text-sm text-white/60">{task.description}</p>
+                            )}
+                            <TaskComments taskId={task.id} />
+                          </div>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Milestones Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Flag className="w-5 h-5" />
+                  Milestones ({milestones.length})
+                </h2>
+                <div className="flex items-center gap-2">
+                  {project.budget && project.budget > 0 && project.client_id && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleGenerateInvoices}
+                      disabled={invoiceActionLoading === 'generate'}
+                      leftIcon={invoiceActionLoading === 'generate' ? <Loader2 className="w-4 h-4 animate-spin" /> : <DollarSign className="w-4 h-4" />}
+                    >
+                      Generate Invoices
+                    </Button>
+                  )}
+                  <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddMilestone}>
+                    Add Milestone
+                  </Button>
+                </div>
+              </div>
+              {milestones.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <Flag className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-white mb-2">No Milestones Yet</h3>
+                  <p className="text-white/40 text-sm mb-4">Add milestones to track key deliverables.</p>
+                  <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAddMilestone}>Create First Milestone</Button>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {milestones.map((milestone) => {
+                    const isCompleted = !!milestone.completed_at
+                    return (
+                      <Card key={milestone.id} className="p-5 group hover:border-white/10 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-4">
+                            <button
+                              onClick={() => handleToggleMilestoneStatus(milestone)}
+                              className={cn(
+                                'w-10 h-10 rounded-lg flex items-center justify-center transition-all',
+                                isCompleted
+                                  ? 'bg-[#23FD9E]/10 hover:bg-[#23FD9E]/20'
+                                  : 'bg-violet-500/10 hover:bg-violet-500/20'
+                              )}
+                            >
+                              {isCompleted ? (
+                                <CheckCircle2 className="w-5 h-5 text-[#23FD9E]" />
+                              ) : (
+                                <Flag className="w-5 h-5 text-violet-400" />
+                              )}
+                            </button>
+                            <div>
+                              <h4 className={cn(
+                                'font-medium',
+                                isCompleted ? 'text-white/60 line-through' : 'text-white'
+                              )}>
+                                {milestone.title}
+                              </h4>
+                              {milestone.description && (
+                                <p className="text-sm text-white/40 mt-1">{milestone.description}</p>
+                              )}
+                              {milestone.payment_amount && milestone.payment_amount > 0 && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <div className="flex items-center gap-1 text-sm text-[#23FD9E]">
+                                    <DollarSign className="w-3.5 h-3.5" />
+                                    <span>{formatCurrency(milestone.payment_amount)}</span>
+                                  </div>
+                                  {(() => {
+                                    const inv = milestoneInvoiceMap.get(milestone.id)
+                                    if (inv) {
+                                      return (
+                                        <div className="flex items-center gap-1.5">
+                                          <Badge className={
+                                            inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 text-xs' :
+                                            inv.status === 'sent' ? 'bg-blue-500/10 text-blue-400 text-xs' :
+                                            inv.status === 'overdue' ? 'bg-red-500/10 text-red-400 text-xs' :
+                                            inv.status === 'cancelled' ? 'bg-white/10 text-white/40 text-xs' :
+                                            'bg-white/10 text-white/60 text-xs'
+                                          }>
+                                            {inv.invoice_number} &middot; {inv.status}
+                                          </Badge>
+                                          {inv.status === 'draft' && (
+                                            <button
+                                              onClick={() => handleSendMilestoneInvoice(inv.id)}
+                                              disabled={invoiceActionLoading === inv.id}
+                                              className="p-1 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
+                                              title="Send Invoice"
+                                            >
+                                              {invoiceActionLoading === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                            </button>
+                                          )}
+                                          {inv.stripe_invoice_url && (
+                                            <a href={inv.stripe_invoice_url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-white/[0.06] text-white/40 transition-colors" title="View on Stripe">
+                                              <ExternalLink className="w-3.5 h-3.5" />
+                                            </a>
+                                          )}
+                                        </div>
+                                      )
+                                    }
+                                    return null
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <div className="text-right">
+                              <Badge className={isCompleted ? 'bg-[#23FD9E]/10 text-[#23FD9E]' : 'bg-amber-500/10 text-amber-400'}>
+                                {isCompleted ? 'Completed' : 'Pending'}
+                              </Badge>
+                              {milestone.due_date && (
+                                <p className={cn(
+                                  'text-sm mt-2',
+                                  !isCompleted && new Date(milestone.due_date) < new Date()
+                                    ? 'text-red-400'
+                                    : 'text-white/40'
+                                )}>
+                                  Due {formatDate(milestone.due_date, 'MMM d, yyyy')}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => openEditMilestone(milestone)}
+                                className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+                                title="Edit milestone"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMilestone(milestone.id)}
+                                disabled={deletingMilestoneId === milestone.id}
+                                className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
+                                title="Delete milestone"
+                              >
+                                {deletingMilestoneId === milestone.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Deliverables Section */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Deliverables ({deliverables.length})
+                </h2>
+                <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddDeliverable}>
+                  Add Deliverable
+                </Button>
+              </div>
+              {deliverablesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-[#23FD9E] animate-spin" />
+                </div>
+              ) : deliverables.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <Package className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-white mb-2">No Deliverables Yet</h3>
+                  <p className="text-white/40 text-sm mb-4">Add deliverables to track content for client review.</p>
+                  <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAddDeliverable}>Create First Deliverable</Button>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {deliverables.map((deliverable) => {
+                    const Icon = getDeliverableIcon(deliverable.type)
+                    const colorClass = getDeliverableTypeColor(deliverable.type)
+                    return (
+                      <Card key={deliverable.id} className="p-5 group hover:border-white/10 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-4">
+                            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', colorClass)}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-white">{deliverable.title}</h4>
+                              {deliverable.description && (
+                                <p className="text-sm text-white/40 mt-1 line-clamp-2">{deliverable.description}</p>
+                              )}
+                              <div className="flex items-center gap-3 mt-2">
+                                <Badge className={colorClass}>
+                                  {deliverable.type}
+                                </Badge>
+                                <Badge className={
+                                  deliverable.status === 'approved' ? 'bg-[#23FD9E]/10 text-[#23FD9E]' :
+                                  deliverable.status === 'in_review' ? 'bg-amber-500/10 text-amber-400' :
+                                  deliverable.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
+                                  deliverable.status === 'final' ? 'bg-violet-500/10 text-violet-400' :
+                                  'bg-white/5 text-white/60'
+                                }>
+                                  {deliverable.status.replace('_', ' ')}
+                                </Badge>
+                                <span className="text-xs text-white/30">v{deliverable.current_version}</span>
+                              </div>
+                            </div>
                           </div>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => openEditMilestone(milestone)}
+                              onClick={() => openEditDeliverable(deliverable)}
                               className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                              title="Edit milestone"
+                              title="Edit deliverable"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteMilestone(milestone.id)}
-                              disabled={deletingMilestoneId === milestone.id}
+                              onClick={() => handleDeleteDeliverable(deliverable.id)}
+                              disabled={deletingDeliverableId === deliverable.id}
                               className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
-                              title="Delete milestone"
+                              title="Delete deliverable"
                             >
-                              {deletingMilestoneId === milestone.id ? (
+                              {deletingDeliverableId === deliverable.id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
                                 <Trash2 className="w-4 h-4" />
@@ -1123,102 +1221,19 @@ export default function ProjectDetailPage() {
                             </button>
                           </div>
                         </div>
-                      </div>
-                    </Card>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'deliverables' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white">Deliverables</h2>
-              <Button size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={openAddDeliverable}>
-                Add Deliverable
-              </Button>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-            {deliverablesLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 text-[#23FD9E] animate-spin" />
-              </div>
-            ) : deliverables.length === 0 ? (
-              <Card className="p-8 text-center">
-                <Package className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">No Deliverables Yet</h3>
-                <p className="text-white/40 text-sm mb-4">Add deliverables to track content for client review.</p>
-                <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openAddDeliverable}>Create First Deliverable</Button>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {deliverables.map((deliverable) => {
-                  const Icon = getDeliverableIcon(deliverable.type)
-                  const colorClass = getDeliverableTypeColor(deliverable.type)
-                  return (
-                    <Card key={deliverable.id} className="p-5 group hover:border-white/10 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-4">
-                          <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', colorClass)}>
-                            <Icon className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-white">{deliverable.title}</h4>
-                            {deliverable.description && (
-                              <p className="text-sm text-white/40 mt-1 line-clamp-2">{deliverable.description}</p>
-                            )}
-                            <div className="flex items-center gap-3 mt-2">
-                              <Badge className={colorClass}>
-                                {deliverable.type}
-                              </Badge>
-                              <Badge className={
-                                deliverable.status === 'approved' ? 'bg-[#23FD9E]/10 text-[#23FD9E]' :
-                                deliverable.status === 'in_review' ? 'bg-amber-500/10 text-amber-400' :
-                                deliverable.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
-                                deliverable.status === 'final' ? 'bg-violet-500/10 text-violet-400' :
-                                'bg-white/5 text-white/60'
-                              }>
-                                {deliverable.status.replace('_', ' ')}
-                              </Badge>
-                              <span className="text-xs text-white/30">v{deliverable.current_version}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => openEditDeliverable(deliverable)}
-                            className="p-1.5 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-colors"
-                            title="Edit deliverable"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDeliverable(deliverable.id)}
-                            disabled={deletingDeliverableId === deliverable.id}
-                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
-                            title="Delete deliverable"
-                          >
-                            {deletingDeliverableId === deliverable.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </Card>
-                  )
-                })}
-              </div>
-            )}
           </div>
         )}
 
         {activeTab === 'financials' && (
           <div className="space-y-8">
             <div>
-              <h2 className="text-lg font-semibold text-white mb-4">Budget & Profit Dashboard</h2>
+              <h2 className="text-lg font-semibold text-white mb-4">Financial Dashboard</h2>
               <FinancialDashboard projectId={projectId} />
             </div>
             <div>
@@ -1237,32 +1252,36 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {activeTab === 'health' && (
-          <div className="grid grid-cols-3 gap-6">
-            <div className="col-span-2">
-              <HealthReport
-                report={report}
-                history={history}
-                onRunAnalysis={runAnalysis}
-                analyzing={analyzing}
-              />
-            </div>
+        {activeTab === 'health-activity' && (
+          <div className="space-y-8">
+            {/* Health Section */}
             <div>
-              <MonitoringConfig
-                settings={settings}
-                onUpdate={updateSettings}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <HealthReport
+                    report={report}
+                    history={history}
+                    onRunAnalysis={runAnalysis}
+                    analyzing={analyzing}
+                  />
+                </div>
+                <div>
+                  <MonitoringConfig
+                    settings={settings}
+                    onUpdate={updateSettings}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Activity Section */}
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-4">Activity</h2>
+              <ActivityFeed
+                activities={activities}
+                loading={activitiesLoading}
               />
             </div>
-          </div>
-        )}
-
-        {activeTab === 'activity' && (
-          <div className="max-w-3xl">
-            <h2 className="text-lg font-semibold text-white mb-6">Activity Feed</h2>
-            <ActivityFeed
-              activities={activities}
-              loading={activitiesLoading}
-            />
           </div>
         )}
       </div>
@@ -1563,7 +1582,7 @@ export default function ProjectDetailPage() {
             />
           </div>
           <Input
-            label="Budget"
+            label="Quote"
             type="number"
             value={projectForm.budget}
             onChange={(e) => setProjectForm({ ...projectForm, budget: e.target.value })}

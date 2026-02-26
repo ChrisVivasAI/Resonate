@@ -572,7 +572,7 @@ export async function executeToolCall(
             tasks: { total: context.tasks.length, completed: completedTasks, overdue: overdueTasks },
             milestones: { total: context.milestones.length, completed: completedMilestones },
             deliverables: { total: context.deliverables.length },
-            budget: {
+            quote: {
               total: context.financials.budget,
               spent: context.financials.totalExpenses + context.financials.totalLabor,
               remaining: context.financials.remainingBudget,
@@ -604,14 +604,14 @@ export async function executeToolCall(
         return {
           call_id: toolCall.id,
           result: {
-            budget: context.financials.budget,
+            quote: context.financials.budget,
             total_expenses: context.financials.totalExpenses,
             total_labor: context.financials.totalLabor,
             total_spent: context.financials.totalExpenses + context.financials.totalLabor,
-            remaining_budget: context.financials.remainingBudget,
+            remaining_on_quote: context.financials.remainingBudget,
             pending_reimbursements: context.financials.reimbursementsPending,
             pending_returns: context.financials.returnsPending,
-            budget_utilization: context.financials.budget > 0
+            quote_utilization: context.financials.budget > 0
               ? ((context.financials.totalExpenses + context.financials.totalLabor) / context.financials.budget * 100).toFixed(1) + '%'
               : 'N/A',
           },
@@ -626,8 +626,8 @@ export async function executeToolCall(
           t.due_date && new Date(t.due_date) < new Date() && t.status !== 'completed'
         ).length
 
-        const budgetUsed = context.financials.totalExpenses + context.financials.totalLabor
-        const budgetPercent = context.financials.budget > 0 ? (budgetUsed / context.financials.budget) * 100 : 0
+        const quoteUsed = context.financials.totalExpenses + context.financials.totalLabor
+        const quotePercent = context.financials.budget > 0 ? (quoteUsed / context.financials.budget) * 100 : 0
 
         let healthScore = 100
         let status: 'healthy' | 'at_risk' | 'critical' = 'healthy'
@@ -646,12 +646,12 @@ export async function executeToolCall(
         }
 
         // Budget
-        if (budgetPercent > 90) {
+        if (quotePercent > 90) {
           healthScore -= 20
-          issues.push('Budget nearly exhausted')
-        } else if (budgetPercent > 80) {
+          issues.push('Quote nearly exhausted')
+        } else if (quotePercent > 80) {
           healthScore -= 10
-          issues.push('Budget at 80%+')
+          issues.push('Quote at 80%+')
         }
 
         if (healthScore < 50) status = 'critical'
@@ -664,7 +664,7 @@ export async function executeToolCall(
             status,
             issues,
             recommendations: issues.length > 0
-              ? ['Address overdue tasks', 'Review budget allocation', 'Update project timeline']
+              ? ['Address overdue tasks', 'Review quote allocation', 'Update project timeline']
               : ['Project is on track', 'Continue current pace'],
           },
         }

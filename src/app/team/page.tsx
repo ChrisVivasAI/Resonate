@@ -6,6 +6,7 @@ import { Users, DollarSign, FolderKanban, Loader2, CircleDollarSign, Check, Plus
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, Avatar, Button, Modal, Input, Badge } from '@/components/ui'
 import { useTeamMembers } from '@/hooks'
+import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 
 export default function TeamPage() {
@@ -93,7 +94,7 @@ export default function TeamPage() {
               </div>
               <div>
                 <p className="text-xs text-obsidian-400">Total Earned</p>
-                <p className="text-2xl font-semibold text-white">${totalEarned.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-white">{formatCurrency(totalEarned)}</p>
               </div>
             </div>
           </Card>
@@ -106,7 +107,7 @@ export default function TeamPage() {
               </div>
               <div>
                 <p className="text-xs text-obsidian-400">Total Owed</p>
-                <p className="text-2xl font-semibold text-amber-400">${totalOwed.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-amber-400">{formatCurrency(totalOwed)}</p>
               </div>
             </div>
           </Card>
@@ -119,7 +120,7 @@ export default function TeamPage() {
               </div>
               <div>
                 <p className="text-xs text-obsidian-400">Total Paid</p>
-                <p className="text-2xl font-semibold text-emerald-400">${totalPaid.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-emerald-400">{formatCurrency(totalPaid)}</p>
               </div>
             </div>
           </Card>
@@ -186,15 +187,15 @@ export default function TeamPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-sm text-white text-right font-medium">
-                      ${member.totalEarned.toFixed(2)}
+                      {formatCurrency(member.totalEarned)}
                     </td>
                     <td className="py-3 px-4 text-sm text-right font-medium">
                       <span className={member.totalOwed > 0 ? 'text-amber-400' : 'text-obsidian-400'}>
-                        ${member.totalOwed.toFixed(2)}
+                        {formatCurrency(member.totalOwed)}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-right font-medium">
-                      <span className="text-emerald-400">${member.totalPaid.toFixed(2)}</span>
+                      <span className="text-emerald-400">{formatCurrency(member.totalPaid)}</span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2">

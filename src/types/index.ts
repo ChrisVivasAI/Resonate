@@ -36,6 +36,7 @@ export interface Project {
   description?: string
   status: 'draft' | 'in_progress' | 'review' | 'completed' | 'cancelled'
   priority: 'low' | 'medium' | 'high' | 'urgent'
+  /** Client-facing quote amount for the project */
   budget: number
   deposit_percentage: number
   spent: number

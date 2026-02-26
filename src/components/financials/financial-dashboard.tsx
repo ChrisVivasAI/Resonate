@@ -9,10 +9,6 @@ import {
   TrendingDown,
   Wallet,
   Receipt,
-  Clock,
-  AlertTriangle,
-  CheckCircle,
-  PieChart,
   RotateCcw,
   CreditCard,
 } from 'lucide-react'
@@ -52,9 +48,7 @@ export function FinancialDashboard({ projectId }: FinancialDashboardProps) {
 
   const { summary, expenses, labor, invoices, reimbursements, returns } = financials
 
-  const budgetUsedPercent = summary.clientBudget > 0 ? (summary.totalClientCharges / summary.clientBudget) * 100 : 0
-  const internalBudgetUsedPercent =
-    summary.internalBudgetCap > 0 ? (summary.totalInternalCost / summary.internalBudgetCap) * 100 : 0
+  const quoteInvoicedPercent = summary.quoteAmount > 0 ? (summary.totalInvoiced / summary.quoteAmount) * 100 : 0
 
   const getBudgetStatusColor = (percent: number) => {
     if (percent >= 100) return 'text-red-400'
@@ -73,13 +67,13 @@ export function FinancialDashboard({ projectId }: FinancialDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Budget & Profit Overview */}
+      {/* Quote & Profit Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard variant="default">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-obsidian-400 mb-1">Client Budget</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(summary.clientBudget)}</p>
+              <p className="text-sm text-obsidian-400 mb-1">Quote</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(summary.quoteAmount)}</p>
             </div>
             <div className="p-2 bg-ember-500/10 rounded-lg">
               <Wallet className="w-5 h-5 text-ember-400" />
@@ -87,31 +81,10 @@ export function FinancialDashboard({ projectId }: FinancialDashboardProps) {
           </div>
           <div className="mt-4">
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-obsidian-400">Used</span>
-              <span className={getBudgetStatusColor(budgetUsedPercent)}>{budgetUsedPercent.toFixed(1)}%</span>
+              <span className="text-obsidian-400">Invoiced</span>
+              <span className={getBudgetStatusColor(quoteInvoicedPercent)}>{quoteInvoicedPercent.toFixed(1)}%</span>
             </div>
-            <Progress value={Math.min(budgetUsedPercent, 100)} className="h-2" />
-          </div>
-        </StatCard>
-
-        <StatCard variant="default">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-obsidian-400 mb-1">Internal Budget Cap</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(summary.internalBudgetCap)}</p>
-            </div>
-            <div className="p-2 bg-blue-500/10 rounded-lg">
-              <PieChart className="w-5 h-5 text-blue-400" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-obsidian-400">Used</span>
-              <span className={getBudgetStatusColor(internalBudgetUsedPercent)}>
-                {internalBudgetUsedPercent.toFixed(1)}%
-              </span>
-            </div>
-            <Progress value={Math.min(internalBudgetUsedPercent, 100)} className="h-2" />
+            <Progress value={Math.min(quoteInvoicedPercent, 100)} className="h-2" />
           </div>
         </StatCard>
 
@@ -144,58 +117,30 @@ export function FinancialDashboard({ projectId }: FinancialDashboardProps) {
         <StatCard variant="default">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-obsidian-400 mb-1">Remaining Budget</p>
-              <p className={`text-2xl font-bold ${summary.remainingBudget >= 0 ? 'text-white' : 'text-red-400'}`}>
-                {formatCurrency(summary.remainingBudget)}
-              </p>
+              <p className="text-sm text-obsidian-400 mb-1">Total Expenses</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(summary.totalInternalCost)}</p>
             </div>
-            <div className={`p-2 rounded-lg ${summary.remainingBudget >= 0 ? 'bg-slate-500/10' : 'bg-red-500/10'}`}>
-              {summary.remainingBudget >= 0 ? (
-                <CheckCircle className="w-5 h-5 text-slate-400" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-              )}
+            <div className="p-2 bg-obsidian-500/10 rounded-lg">
+              <Receipt className="w-5 h-5 text-obsidian-400" />
             </div>
           </div>
-          <p className="mt-3 text-sm text-obsidian-400">
-            Internal: {formatCurrency(summary.remainingInternalBudget)}
-          </p>
+        </StatCard>
+
+        <StatCard variant="default">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-obsidian-400 mb-1">Total Payments</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(summary.paidInvoices)}</p>
+            </div>
+            <div className="p-2 bg-emerald-500/10 rounded-lg">
+              <DollarSign className="w-5 h-5 text-emerald-400" />
+            </div>
+          </div>
         </StatCard>
       </div>
 
       {/* Cost Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Client Charges vs Internal Cost */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Cost Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-obsidian-800/30 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <Receipt className="w-5 h-5 text-ember-400" />
-                  <span className="text-sm text-obsidian-300">Total Client Charges</span>
-                </div>
-                <span className="font-semibold text-white">{formatCurrency(summary.totalClientCharges)}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-obsidian-800/30 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <DollarSign className="w-5 h-5 text-amber-400" />
-                  <span className="text-sm text-obsidian-300">Total Internal Cost</span>
-                </div>
-                <span className="font-semibold text-white">{formatCurrency(summary.totalInternalCost)}</span>
-              </div>
-              <div className="border-t border-obsidian-700 pt-4 flex items-center justify-between">
-                <span className="text-sm text-obsidian-400">Profit</span>
-                <span className={`font-bold text-lg ${summary.grossProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {formatCurrency(summary.grossProfit)}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Expenses Breakdown */}
         <Card>
           <CardHeader>
@@ -302,6 +247,7 @@ export function FinancialDashboard({ projectId }: FinancialDashboardProps) {
       </Card>
 
       {/* Reimbursements & Returns Summary */}
+      <h3 className="text-sm font-medium text-obsidian-400 uppercase tracking-wider">Reimbursements & Returns</h3>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Reimbursements */}
         <Card>

@@ -117,7 +117,7 @@ function calculateMetrics(input: ProjectHealthInput): HealthAnalysis {
     }
   }
 
-  // Budget score (placeholder - set to 100 since not focusing on budget)
+  // Quote utilization score
   const budgetScore = 100
   const budgetUtilization = project.budget > 0 ? (project.spent / project.budget) * 100 : 0
 

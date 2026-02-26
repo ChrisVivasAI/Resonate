@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Filter, Clock, DollarSign, Check, CircleDollarSign } from 'lucide-react'
 import { useLabor, type LaborEntry, type LaborInput, type BillingType } from '@/hooks'
+import { formatCurrency } from '@/lib/utils'
 
 const BILLING_TYPE_LABELS: Record<string, { badge: string; suffix: string }> = {
   hourly: { badge: 'Hourly', suffix: '/hr' },
@@ -259,7 +260,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                     const typeColor = BILLING_TYPE_COLORS[entryType] || BILLING_TYPE_COLORS.hourly
                     return (
                       <tr key={entry.id} className="border-b border-obsidian-800/50 hover:bg-obsidian-800/30">
-                        <td className="py-3 px-4 text-sm text-slate-300">{entry.team_member_name || '-'}</td>
+                        <td className="py-3 px-4 text-sm text-slate-300">{entry.team_member?.full_name || entry.team_member_name || '-'}</td>
                         <td className="py-3 px-4">
                           <Badge variant="default">{entry.role}</Badge>
                         </td>
@@ -269,7 +270,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-sm text-slate-300 text-right">
-                          ${Number(entry.hourly_rate).toFixed(2)}{typeInfo.suffix}
+                          {formatCurrency(Number(entry.hourly_rate))}{typeInfo.suffix}
                         </td>
                         <td className="py-3 px-4 text-sm text-slate-300 text-right">
                           {Number(entry.estimated_hours).toFixed(1)}
@@ -283,11 +284,11 @@ export function LaborTable({ projectId }: LaborTableProps) {
                           {Number(entry.actual_hours).toFixed(1)}
                         </td>
                         <td className="py-3 px-4 text-sm text-slate-300 text-right">
-                          ${Number(entry.estimated_cost).toFixed(2)}
+                          {formatCurrency(Number(entry.estimated_cost))}
                         </td>
                         <td className="py-3 px-4 text-sm text-right font-medium">
                           <span className={variance > 0 ? 'text-red-400' : 'text-emerald-400'}>
-                            ${Number(entry.actual_cost).toFixed(2)}
+                            {formatCurrency(Number(entry.actual_cost))}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -364,7 +365,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                   <DollarSign className="w-5 h-5 text-slate-400" />
                   <div>
                     <div className="text-xs text-obsidian-400">Est. Cost</div>
-                    <div className="text-lg font-semibold text-white">${totals.estimatedCost.toFixed(2)}</div>
+                    <div className="text-lg font-semibold text-white">{formatCurrency(totals.estimatedCost)}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-obsidian-800/30 rounded-xl">
@@ -376,7 +377,7 @@ export function LaborTable({ projectId }: LaborTableProps) {
                         totals.actualCost > totals.estimatedCost ? 'text-red-400' : 'text-emerald-400'
                       }`}
                     >
-                      ${totals.actualCost.toFixed(2)}
+                      {formatCurrency(totals.actualCost)}
                     </div>
                   </div>
                 </div>
@@ -384,14 +385,14 @@ export function LaborTable({ projectId }: LaborTableProps) {
                   <CircleDollarSign className="w-5 h-5 text-amber-400" />
                   <div>
                     <div className="text-xs text-obsidian-400">Total Owed</div>
-                    <div className="text-lg font-semibold text-amber-400">${totals.totalOwed.toFixed(2)}</div>
+                    <div className="text-lg font-semibold text-amber-400">{formatCurrency(totals.totalOwed)}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-obsidian-800/30 rounded-xl">
                   <Check className="w-5 h-5 text-emerald-400" />
                   <div>
                     <div className="text-xs text-obsidian-400">Total Paid</div>
-                    <div className="text-lg font-semibold text-emerald-400">${totals.totalPaid.toFixed(2)}</div>
+                    <div className="text-lg font-semibold text-emerald-400">{formatCurrency(totals.totalPaid)}</div>
                   </div>
                 </div>
               </div>

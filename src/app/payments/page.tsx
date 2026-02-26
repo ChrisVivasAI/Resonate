@@ -195,7 +195,7 @@ export default function PaymentsPage() {
       project_id: invoice.project_id || '',
       amount: String(invoice.amount),
       tax_amount: String(invoice.tax_amount),
-      due_date: invoice.due_date || '',
+      due_date: invoice.due_date ? invoice.due_date.split('T')[0] : '',
       notes: invoice.notes || '',
       line_items: invoice.line_items?.length > 0 ? invoice.line_items : [{ id: crypto.randomUUID(), description: '', quantity: 1, unit_price: 0, total: 0 }],
     })

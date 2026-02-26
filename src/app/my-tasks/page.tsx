@@ -41,7 +41,7 @@ interface AssignedTask {
 type FilterStatus = 'all' | 'active' | 'completed'
 
 export default function MyTasksPage() {
-  const { supabase, user } = useAuth()
+  const { user } = useAuth()
   const [tasks, setTasks] = useState<AssignedTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,12 +72,18 @@ export default function MyTasksPage() {
   const handleUpdateStatus = async (taskId: string, newStatus: AssignedTask['status']) => {
     setUpdatingTaskId(taskId)
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus, ...(newStatus === 'completed' ? { completed_at: new Date().toISOString() } : { completed_at: null }) })
-        .eq('id', taskId)
-
-      if (error) throw error
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: newStatus,
+          ...(newStatus === 'completed' ? { completed_at: new Date().toISOString() } : { completed_at: null }),
+        }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to update task')
+      }
       await fetchTasks()
     } catch (err) {
       console.error('Error updating task:', err)

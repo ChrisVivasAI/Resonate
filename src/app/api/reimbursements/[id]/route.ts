@@ -49,20 +49,63 @@ export async function PATCH(
 
     const body = await request.json()
 
+    // Whitelist allowed fields
+    const allowedFields = ['description', 'amount', 'status', 'notes', 'receipt_url', 'person_name']
+    const updates: Record<string, unknown> = {}
+    for (const key of allowedFields) {
+      if (key in body) updates[key] = body[key]
+    }
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
+    // Role check for approval/payment
+    if (updates.status === 'approved' || updates.status === 'paid') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (!profile || !['admin', 'member'].includes(profile.role)) {
+        return NextResponse.json({ error: 'Only admins and members can approve or pay reimbursements' }, { status: 403 })
+      }
+    }
+
+    // Status transition validation
+    if (updates.status) {
+      const { data: current } = await supabase
+        .from('reimbursements')
+        .select('status')
+        .eq('id', id)
+        .single()
+      const validTransitions: Record<string, string[]> = {
+        pending: ['approved', 'rejected'],
+        approved: ['paid', 'rejected'],
+        rejected: ['pending'],
+        paid: [],
+      }
+      if (current && !validTransitions[current.status]?.includes(updates.status as string)) {
+        return NextResponse.json(
+          { error: `Cannot transition from '${current.status}' to '${updates.status}'` },
+          { status: 400 }
+        )
+      }
+    }
+
     // If status is being changed to 'approved', set approved_by and date_approved
-    if (body.status === 'approved') {
-      body.approved_by = user.id
-      body.date_approved = new Date().toISOString().split('T')[0]
+    if (updates.status === 'approved') {
+      updates.approved_by = user.id
+      updates.date_approved = new Date().toISOString().split('T')[0]
     }
 
     // If status is being changed to 'paid', set date_paid
-    if (body.status === 'paid' && !body.date_paid) {
-      body.date_paid = new Date().toISOString().split('T')[0]
+    if (updates.status === 'paid' && !updates.date_paid) {
+      updates.date_paid = new Date().toISOString().split('T')[0]
     }
 
     const { data: reimbursement, error } = await supabase
       .from('reimbursements')
-      .update(body)
+      .update(updates)
       .eq('id', id)
       .select()
       .single()

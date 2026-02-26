@@ -6,6 +6,7 @@ import { DollarSign, FolderKanban, Loader2, CircleDollarSign, Check, ArrowLeft, 
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, Badge, Avatar, Button } from '@/components/ui'
 import { useTeamMember } from '@/hooks'
+import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import { useState } from 'react'
 
@@ -72,6 +73,13 @@ export default function TeamMemberPage() {
 
   const { profile, laborEntries, totals } = data
 
+  const BILLING_TYPE_SUFFIXES: Record<string, string> = {
+    hourly: '/hr',
+    per_item: '/item',
+    per_asset: '/asset',
+    per_service: '/service',
+  }
+
   return (
     <DashboardLayout>
       <div className="mb-6">
@@ -100,7 +108,7 @@ export default function TeamMemberPage() {
               </div>
               <div>
                 <p className="text-xs text-obsidian-400">Total Earned</p>
-                <p className="text-2xl font-semibold text-white">${totals.totalEarned.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-white">{formatCurrency(totals.totalEarned)}</p>
               </div>
             </div>
           </Card>
@@ -113,7 +121,7 @@ export default function TeamMemberPage() {
               </div>
               <div>
                 <p className="text-xs text-obsidian-400">Total Owed</p>
-                <p className="text-2xl font-semibold text-amber-400">${totals.totalOwed.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-amber-400">{formatCurrency(totals.totalOwed)}</p>
               </div>
             </div>
           </Card>
@@ -126,7 +134,7 @@ export default function TeamMemberPage() {
               </div>
               <div>
                 <p className="text-xs text-obsidian-400">Total Paid</p>
-                <p className="text-2xl font-semibold text-emerald-400">${totals.totalPaid.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-emerald-400">{formatCurrency(totals.totalPaid)}</p>
               </div>
             </div>
           </Card>
@@ -204,13 +212,13 @@ export default function TeamMemberPage() {
                         <Badge variant="default">{entry.role}</Badge>
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-300 text-right">
-                        ${Number(entry.hourly_rate).toFixed(2)}
+                        {formatCurrency(Number(entry.hourly_rate))}{BILLING_TYPE_SUFFIXES[entry.billing_type || 'hourly'] || '/hr'}
                       </td>
                       <td className="py-3 px-4 text-sm text-slate-300 text-right">
                         {Number(entry.actual_hours).toFixed(1)}
                       </td>
                       <td className="py-3 px-4 text-sm text-white text-right font-medium">
-                        ${Number(entry.actual_cost).toFixed(2)}
+                        {formatCurrency(Number(entry.actual_cost))}
                       </td>
                       <td className="py-3 px-4 text-center">
                         {Number(entry.actual_cost) > 0 ? (

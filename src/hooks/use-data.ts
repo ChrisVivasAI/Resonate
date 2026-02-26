@@ -216,6 +216,13 @@ export function useProjects(clientId?: string) {
   }
 
   const updateProject = async (id: string, updates: Partial<Project>) => {
+    if (updates.status === 'completed' && !updates.completed_at) {
+      updates.completed_at = new Date().toISOString()
+    }
+    if (updates.status && updates.status !== 'completed') {
+      updates.completed_at = undefined
+    }
+
     const { data, error } = await supabase
       .from('projects')
       .update(updates)
@@ -305,6 +312,13 @@ export function useProject(projectId: string | null) {
 
   const updateProject = async (updates: Partial<Project>) => {
     if (!projectId) return null
+
+    if (updates.status === 'completed' && !updates.completed_at) {
+      updates.completed_at = new Date().toISOString()
+    }
+    if (updates.status && updates.status !== 'completed') {
+      updates.completed_at = undefined
+    }
 
     const { data, error } = await supabase
       .from('projects')
@@ -517,9 +531,14 @@ export function useDashboardStats() {
   const { supabase, loading: authLoading } = useAuth()
   const [stats, setStats] = useState({
     totalRevenue: 0,
+    thisMonthRevenue: 0,
+    lastMonthRevenue: 0,
+    revenueChange: 0,
     activeProjects: 0,
     totalClients: 0,
+    newClientsThisMonth: 0,
     completedThisMonth: 0,
+    completedLastMonth: 0,
   })
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [recentPayments, setRecentPayments] = useState<Payment[]>([])
@@ -537,36 +556,55 @@ export function useDashboardStats() {
         setLoading(true)
         setError(null)
 
+        const now = new Date()
         const startOfMonth = new Date()
         startOfMonth.setDate(1)
         startOfMonth.setHours(0, 0, 0, 0)
 
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+
         // Fetch all data in parallel for better performance
         const [
-          paymentsResult,
+          paidInvoicesResult,
           activeProjectsResult,
           totalClientsResult,
           completedThisMonthResult,
           recentProjectsResult,
           recentPaymentsResult,
+          thisMonthInvoicesResult,
+          lastMonthInvoicesResult,
+          newClientsResult,
+          completedLastMonthResult,
         ] = await Promise.all([
-          supabase.from('payments').select('amount').eq('status', 'succeeded'),
+          supabase.from('invoices').select('total_amount').eq('status', 'paid'),
           supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['in_progress', 'review']),
           supabase.from('clients').select('*', { count: 'exact', head: true }),
           supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'completed').gte('completed_at', startOfMonth.toISOString()),
           supabase.from('projects').select(`*, client:clients(*)`).in('status', ['in_progress', 'review']).order('updated_at', { ascending: false }).limit(4),
           supabase.from('payments').select(`*, client:clients(*)`).order('created_at', { ascending: false }).limit(5),
+          supabase.from('invoices').select('total_amount').eq('status', 'paid').gte('paid_at', startOfMonth.toISOString()),
+          supabase.from('invoices').select('total_amount').eq('status', 'paid').gte('paid_at', startOfLastMonth.toISOString()).lt('paid_at', startOfMonth.toISOString()),
+          supabase.from('clients').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
+          supabase.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'completed').gte('completed_at', startOfLastMonth.toISOString()).lt('completed_at', startOfMonth.toISOString()),
         ])
 
         if (!isMounted) return
 
-        const totalRevenue = paymentsResult.data?.reduce((sum, p) => sum + Number(p.amount), 0) || 0
+        const totalRevenue = paidInvoicesResult.data?.reduce((sum, p) => sum + Number(p.total_amount), 0) || 0
+        const thisMonthRevenue = thisMonthInvoicesResult.data?.reduce((sum, p) => sum + Number(p.total_amount), 0) || 0
+        const lastMonthRevenue = lastMonthInvoicesResult.data?.reduce((sum, p) => sum + Number(p.total_amount), 0) || 0
+        const revenueChange = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0
 
         setStats({
           totalRevenue,
+          thisMonthRevenue,
+          lastMonthRevenue,
+          revenueChange,
           activeProjects: activeProjectsResult.count || 0,
           totalClients: totalClientsResult.count || 0,
+          newClientsThisMonth: newClientsResult.count || 0,
           completedThisMonth: completedThisMonthResult.count || 0,
+          completedLastMonth: completedLastMonthResult.count || 0,
         })
 
         setRecentProjects(recentProjectsResult.data || [])

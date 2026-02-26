@@ -49,9 +49,18 @@ export async function PATCH(
 
     const body = await request.json()
 
+    const allowedFields = ['description', 'category', 'vendor', 'cost_pre_tax', 'tax', 'total', 'client_price', 'markup_percent', 'date', 'receipt_url', 'notes', 'status', 'payment_status', 'payment_method', 'is_billable']
+    const updates: Record<string, unknown> = {}
+    for (const key of allowedFields) {
+      if (key in body) updates[key] = body[key]
+    }
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
     const { data: expense, error } = await supabase
       .from('expenses')
-      .update(body)
+      .update(updates)
       .eq('id', id)
       .select()
       .single()

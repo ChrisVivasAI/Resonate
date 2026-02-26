@@ -14,9 +14,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: laborEntry, error } = await supabase
-      .from('labor_entries')
-      .select('*, team_member:profiles(id, full_name, email), project:projects(id, name)')
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .select('*, project:projects(id, name, status)')
       .eq('id', id)
       .single()
 
@@ -24,11 +24,11 @@ export async function GET(
       throw new Error(error.message)
     }
 
-    return NextResponse.json({ laborEntry })
+    return NextResponse.json({ task })
   } catch (error) {
-    console.error('Error fetching labor entry:', error)
+    console.error('Error fetching task:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch labor entry' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch task' },
       { status: 500 }
     )
   }
@@ -49,7 +49,10 @@ export async function PATCH(
 
     const body = await request.json()
 
-    const allowedFields = ['team_member_id', 'team_member_name', 'role', 'billing_type', 'hourly_rate', 'estimated_hours', 'actual_hours', 'payment_status', 'payment_date', 'payment_method', 'notes']
+    const allowedFields = [
+      'title', 'description', 'status', 'priority', 'due_date',
+      'assignee_id', 'completed_at',
+    ]
     const updates: Record<string, unknown> = {}
     for (const key of allowedFields) {
       if (key in body) updates[key] = body[key]
@@ -58,8 +61,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
-    const { data: laborEntry, error } = await supabase
-      .from('labor_entries')
+    const { data: task, error } = await supabase
+      .from('tasks')
       .update(updates)
       .eq('id', id)
       .select()
@@ -69,11 +72,11 @@ export async function PATCH(
       throw new Error(error.message)
     }
 
-    return NextResponse.json({ laborEntry })
+    return NextResponse.json({ task })
   } catch (error) {
-    console.error('Error updating labor entry:', error)
+    console.error('Error updating task:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update labor entry' },
+      { error: error instanceof Error ? error.message : 'Failed to update task' },
       { status: 500 }
     )
   }
@@ -93,7 +96,7 @@ export async function DELETE(
     }
 
     const { error } = await supabase
-      .from('labor_entries')
+      .from('tasks')
       .delete()
       .eq('id', id)
 
@@ -103,9 +106,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting labor entry:', error)
+    console.error('Error deleting task:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete labor entry' },
+      { error: error instanceof Error ? error.message : 'Failed to delete task' },
       { status: 500 }
     )
   }

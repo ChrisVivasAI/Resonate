@@ -53,6 +53,18 @@ export async function POST(
       )
     }
 
+    // Idempotency: if this invoice already has a Stripe invoice ID (from a previous partial failure),
+    // recover by updating the DB status and return
+    if (invoice.stripe_invoice_id) {
+      const { data: recovered } = await supabase
+        .from('invoices')
+        .update({ status: 'sent' })
+        .eq('id', params.id)
+        .select('*, client:clients(id, name, email, company), project:projects(id, name)')
+        .single()
+      return NextResponse.json({ invoice: recovered || invoice })
+    }
+
     if (!invoice.client_id) {
       return NextResponse.json(
         { error: 'Invoice must have a client to send' },
@@ -170,19 +182,45 @@ export async function POST(
     await stripe.invoices.finalizeInvoice(stripeInvoice.id)
     const sentInvoice = await stripe.invoices.sendInvoice(stripeInvoice.id)
 
-    // Update our DB record
-    const { data: updated, error: updateError } = await supabase
-      .from('invoices')
-      .update({
-        stripe_invoice_id: sentInvoice.id,
-        stripe_invoice_url: sentInvoice.hosted_invoice_url,
-        status: 'sent',
-      })
-      .eq('id', params.id)
-      .select('*, client:clients(id, name, email, company), project:projects(id, name)')
-      .single()
+    // Update our DB record -- critical section: if this fails after Stripe send,
+    // we need to void the Stripe invoice to prevent a dangling charge
+    let updated = null
+    let updateError = null
 
-    if (updateError) throw new Error(updateError.message)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const result = await supabase
+        .from('invoices')
+        .update({
+          stripe_invoice_id: sentInvoice.id,
+          stripe_invoice_url: sentInvoice.hosted_invoice_url,
+          status: 'sent',
+        })
+        .eq('id', params.id)
+        .select('*, client:clients(id, name, email, company), project:projects(id, name)')
+        .single()
+
+      if (!result.error) {
+        updated = result.data
+        updateError = null
+        break
+      }
+      updateError = result.error
+      // Brief delay before retry
+      await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+    }
+
+    if (updateError) {
+      // DB update failed after retries -- void the Stripe invoice to prevent dangling charge
+      console.error('DB update failed after Stripe send, attempting to void Stripe invoice:', updateError.message)
+      try {
+        await stripe.invoices.voidInvoice(sentInvoice.id)
+        console.log('Successfully voided Stripe invoice after DB failure:', sentInvoice.id)
+      } catch (voidError) {
+        // Log but don't mask the original error -- manual intervention needed
+        console.error('CRITICAL: Failed to void Stripe invoice after DB failure:', voidError)
+      }
+      throw new Error(`Invoice was sent via Stripe but database update failed. The Stripe invoice has been voided. Please try again.`)
+    }
 
     return NextResponse.json({ invoice: updated })
   } catch (error) {
