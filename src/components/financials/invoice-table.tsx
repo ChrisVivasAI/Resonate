@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { FileText, Send, Ban, ExternalLink, Loader2, Plus, Pencil, Trash2, X, Download } from 'lucide-react'
+import { FileText, Send, Ban, ExternalLink, Loader2, Plus, Pencil, Trash2, X, Download, MoreVertical, AlertTriangle } from 'lucide-react'
 import { useInvoices } from '@/hooks'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Invoice, InvoiceLineItem } from '@/types'
@@ -53,6 +53,22 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [formLoading, setFormLoading] = useState(false)
   const [form, setForm] = useState(emptyForm())
+
+  // Dropdown + void-confirm state
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [voidConfirmInvoice, setVoidConfirmInvoice] = useState<Invoice | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // Import from Stripe state
   const [showImport, setShowImport] = useState(false)
@@ -156,6 +172,7 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
   }
 
   const handleVoid = async (id: string) => {
+    setVoidConfirmInvoice(null)
     setActionLoading(id)
     try {
       await voidInvoice(id)
@@ -466,140 +483,231 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Invoices
-            {invoices.length > 0 && (
-              <span className="text-xs font-normal text-white/40 ml-1">({invoices.length})</span>
-            )}
-          </CardTitle>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="text-white/40">
-              Outstanding: <span className="text-amber-400 font-medium">{formatCurrency(totals.outstanding)}</span>
-            </div>
-            <div className="text-white/40">
-              Paid: <span className="text-emerald-400 font-medium">{formatCurrency(totals.paid)}</span>
-            </div>
-            <Button variant="secondary" size="sm" leftIcon={<Download className="w-4 h-4" />} onClick={openImportPanel}>
-              Import from Stripe
-            </Button>
-            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={() => { setShowForm(true); setShowImport(false) }}>
-              Create Invoice
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {invoices.length === 0 ? (
-          <div className="text-center py-6">
-            <FileText className="w-8 h-8 text-white/20 mx-auto mb-2" />
-            <p className="text-white/40 text-sm mb-3">No invoices for this project yet.</p>
-            <div className="flex items-center justify-center gap-3">
-              <Button variant="secondary" size="sm" onClick={openImportPanel}>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Invoices
+              {invoices.length > 0 && (
+                <span className="text-xs font-normal text-white/40 ml-1">({invoices.length})</span>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="text-white/40">
+                Outstanding: <span className="text-amber-400 font-medium">{formatCurrency(totals.outstanding)}</span>
+              </div>
+              <div className="text-white/40">
+                Paid: <span className="text-emerald-400 font-medium">{formatCurrency(totals.paid)}</span>
+              </div>
+              <Button variant="secondary" size="sm" leftIcon={<Download className="w-4 h-4" />} onClick={openImportPanel}>
                 Import from Stripe
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => setShowForm(true)}>
-                Create your first invoice
+              <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />} onClick={() => { setShowForm(true); setShowImport(false) }}>
+                Create Invoice
               </Button>
             </div>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/[0.06]">
-                  <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Invoice</th>
-                  <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Type</th>
-                  <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Amount</th>
-                  <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Status</th>
-                  <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Due</th>
-                  <th className="text-right py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                    <td className="py-3 px-3">
-                      <span className="font-mono text-sm text-white">{invoice.invoice_number}</span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <Badge className="bg-white/5 text-white/60 text-xs">
-                        {typeLabels[invoice.invoice_type] || invoice.invoice_type}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-3 font-medium text-white text-sm">
-                      {formatCurrency(invoice.total_amount)}
-                    </td>
-                    <td className="py-3 px-3">
-                      <Badge className={statusColors[invoice.status] || 'bg-white/10 text-white/60'}>
-                        {invoice.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-3 text-white/40 text-sm">
-                      {invoice.due_date ? formatDate(invoice.due_date) : '-'}
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {invoice.status === 'draft' && (
-                          <>
-                            <button
-                              onClick={() => handleSend(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className="p-1.5 rounded-lg hover:bg-blue-500/10 text-blue-400 transition-colors"
-                              title="Send Invoice"
-                            >
-                              {actionLoading === invoice.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                            </button>
-                            <button
-                              onClick={() => openEdit(invoice)}
-                              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white transition-colors"
-                              title="Edit Invoice"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(invoice.id)}
-                              disabled={actionLoading === invoice.id}
-                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
-                              title="Delete Invoice"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
-                        {invoice.status === 'sent' && (
-                          <button
-                            onClick={() => handleVoid(invoice.id)}
-                            disabled={actionLoading === invoice.id}
-                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors"
-                            title="Void Invoice"
-                          >
-                            {actionLoading === invoice.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                          </button>
-                        )}
-                        {invoice.stripe_invoice_url && (
-                          <a
-                            href={invoice.stripe_invoice_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 transition-colors"
-                            title="View on Stripe"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                      </div>
-                    </td>
+        </CardHeader>
+        <CardContent>
+          {invoices.length === 0 ? (
+            <div className="text-center py-6">
+              <FileText className="w-8 h-8 text-white/20 mx-auto mb-2" />
+              <p className="text-white/40 text-sm mb-3">No invoices for this project yet.</p>
+              <div className="flex items-center justify-center gap-3">
+                <Button variant="secondary" size="sm" onClick={openImportPanel}>
+                  Import from Stripe
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowForm(true)}>
+                  Create your first invoice
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/[0.06]">
+                    <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Invoice</th>
+                    <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Type</th>
+                    <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Amount</th>
+                    <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Status</th>
+                    <th className="text-left py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Due</th>
+                    <th className="text-right py-3 px-3 text-[10px] font-medium text-white/40 uppercase tracking-[0.1em]">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {invoices.map((invoice) => (
+                    <tr key={invoice.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-3">
+                        <span className="font-mono text-sm text-white">{invoice.invoice_number}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <Badge className="bg-white/5 text-white/60 text-xs">
+                          {typeLabels[invoice.invoice_type] || invoice.invoice_type}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-3 font-medium text-white text-sm">
+                        {formatCurrency(invoice.total_amount)}
+                      </td>
+                      <td className="py-3 px-3">
+                        <Badge className={statusColors[invoice.status] || 'bg-white/10 text-white/60'}>
+                          {invoice.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-3 text-white/40 text-sm">
+                        {invoice.due_date ? formatDate(invoice.due_date) : '-'}
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center justify-end" ref={openDropdown === invoice.id ? dropdownRef : undefined}>
+                          {actionLoading === invoice.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-white/40" />
+                          ) : (
+                            <div className="relative">
+                              <button
+                                onClick={() => setOpenDropdown(openDropdown === invoice.id ? null : invoice.id)}
+                                className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white transition-colors"
+                                title="Actions"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+
+                              {openDropdown === invoice.id && (
+                                <div className="absolute right-0 top-8 z-50 w-44 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                                  {/* Send – draft only */}
+                                  {invoice.status === 'draft' && (
+                                    <button
+                                      onClick={() => { setOpenDropdown(null); handleSend(invoice.id) }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+                                    >
+                                      <Send className="w-3.5 h-3.5 text-blue-400" />
+                                      Send Invoice
+                                    </button>
+                                  )}
+
+                                  {/* Edit – draft only */}
+                                  {invoice.status === 'draft' && (
+                                    <button
+                                      onClick={() => { setOpenDropdown(null); openEdit(invoice) }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 text-white/40" />
+                                      Edit Invoice
+                                    </button>
+                                  )}
+
+                                  {/* View on Stripe */}
+                                  {invoice.stripe_invoice_url && (
+                                    <a
+                                      href={invoice.stripe_invoice_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setOpenDropdown(null)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5 text-white/40" />
+                                      View on Stripe
+                                    </a>
+                                  )}
+
+                                  {/* Divider before destructive actions */}
+                                  {(invoice.status === 'sent' || invoice.status === 'draft') && (
+                                    <div className="border-t border-white/[0.06] my-1" />
+                                  )}
+
+                                  {/* Void – sent only */}
+                                  {invoice.status === 'sent' && (
+                                    <button
+                                      onClick={() => { setOpenDropdown(null); setVoidConfirmInvoice(invoice) }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                                    >
+                                      <Ban className="w-3.5 h-3.5" />
+                                      Void Invoice
+                                    </button>
+                                  )}
+
+                                  {/* Delete – draft only */}
+                                  {invoice.status === 'draft' && (
+                                    <button
+                                      onClick={() => { setOpenDropdown(null); handleDelete(invoice.id) }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      Delete Invoice
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Void Confirmation Modal */}
+      {voidConfirmInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setVoidConfirmInvoice(null)}
+          />
+
+          {/* Dialog */}
+          <div className="relative z-10 w-full max-w-md mx-4 bg-[#141414] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Top accent */}
+            <div className="h-1 bg-gradient-to-r from-red-500 via-red-400 to-orange-400" />
+
+            <div className="p-6">
+              {/* Icon + title */}
+              <div className="flex items-start gap-4 mb-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white">Void Invoice?</h3>
+                  <p className="text-sm text-white/50 mt-0.5">{voidConfirmInvoice?.invoice_number}</p>
+                </div>
+              </div>
+
+              {/* Warning body */}
+              <div className="bg-red-500/5 border border-red-500/20 rounded-xl px-4 py-3 mb-6">
+                <p className="text-sm text-white/70 leading-relaxed">
+                  You are about to <span className="text-red-400 font-medium">void</span> this invoice
+                  {' '}(<span className="text-white font-medium">{voidConfirmInvoice?.invoice_number}</span>).
+                  This action <span className="text-white font-medium">cannot be undone</span>.
+                  The invoice will be marked as cancelled and the client will be notified.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setVoidConfirmInvoice(null)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => voidConfirmInvoice && handleVoid(voidConfirmInvoice.id)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center gap-2"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  Void Invoice
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      )}
+    </>
   )
 }
