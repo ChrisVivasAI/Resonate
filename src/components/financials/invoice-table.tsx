@@ -56,12 +56,17 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
 
   // Dropdown + void-confirm state
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const [voidConfirmInvoice, setVoidConfirmInvoice] = useState<Invoice | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      // Don't close if clicking the trigger button (otherwise it double-toggles)
+      const target = e.target as HTMLElement
+      if (target.closest('[data-dropdown-trigger="true"]')) return
+
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpenDropdown(null)
       }
@@ -560,86 +565,26 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
                         {invoice.due_date ? formatDate(invoice.due_date) : '-'}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="flex items-center justify-end" ref={openDropdown === invoice.id ? dropdownRef : undefined}>
+                        <div className="flex items-center justify-end">
                           {actionLoading === invoice.id ? (
                             <Loader2 className="w-4 h-4 animate-spin text-white/40" />
                           ) : (
-                            <div className="relative">
-                              <button
-                                onClick={() => setOpenDropdown(openDropdown === invoice.id ? null : invoice.id)}
-                                className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white transition-colors"
-                                title="Actions"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-
-                              {openDropdown === invoice.id && (
-                                <div className="absolute right-0 top-8 z-50 w-44 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
-                                  {/* Send – draft only */}
-                                  {invoice.status === 'draft' && (
-                                    <button
-                                      onClick={() => { setOpenDropdown(null); handleSend(invoice.id) }}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
-                                    >
-                                      <Send className="w-3.5 h-3.5 text-blue-400" />
-                                      Send Invoice
-                                    </button>
-                                  )}
-
-                                  {/* Edit – draft only */}
-                                  {invoice.status === 'draft' && (
-                                    <button
-                                      onClick={() => { setOpenDropdown(null); openEdit(invoice) }}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
-                                    >
-                                      <Pencil className="w-3.5 h-3.5 text-white/40" />
-                                      Edit Invoice
-                                    </button>
-                                  )}
-
-                                  {/* View on Stripe */}
-                                  {invoice.stripe_invoice_url && (
-                                    <a
-                                      href={invoice.stripe_invoice_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={() => setOpenDropdown(null)}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
-                                    >
-                                      <ExternalLink className="w-3.5 h-3.5 text-white/40" />
-                                      View on Stripe
-                                    </a>
-                                  )}
-
-                                  {/* Divider before destructive actions */}
-                                  {(invoice.status === 'sent' || invoice.status === 'draft') && (
-                                    <div className="border-t border-white/[0.06] my-1" />
-                                  )}
-
-                                  {/* Void – sent only */}
-                                  {invoice.status === 'sent' && (
-                                    <button
-                                      onClick={() => { setOpenDropdown(null); setVoidConfirmInvoice(invoice) }}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                                    >
-                                      <Ban className="w-3.5 h-3.5" />
-                                      Void Invoice
-                                    </button>
-                                  )}
-
-                                  {/* Delete – draft only */}
-                                  {invoice.status === 'draft' && (
-                                    <button
-                                      onClick={() => { setOpenDropdown(null); handleDelete(invoice.id) }}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                      Delete Invoice
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                            <button
+                              data-dropdown-trigger="true"
+                              onClick={(e) => {
+                                if (openDropdown === invoice.id) {
+                                  setOpenDropdown(null)
+                                } else {
+                                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                                  setDropdownPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right })
+                                  setOpenDropdown(invoice.id)
+                                }
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white transition-colors"
+                              title="Actions"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -652,61 +597,126 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
         </CardContent>
       </Card>
 
+      {/* Actions dropdown – fixed position to escape overflow-x-auto clipping */}
+      {openDropdown && (() => {
+        const activeInvoice = invoices.find(inv => inv.id === openDropdown)
+        if (!activeInvoice) return null
+        return (
+          <div
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right }}
+            className="z-50 w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+          >
+            {activeInvoice.status === 'draft' && (
+              <button
+                onClick={() => { setOpenDropdown(null); handleSend(activeInvoice.id) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+              >
+                <Send className="w-3.5 h-3.5 text-blue-400" />
+                Send Invoice
+              </button>
+            )}
+            {activeInvoice.status === 'draft' && (
+              <button
+                onClick={() => { setOpenDropdown(null); openEdit(activeInvoice) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5 text-white/40" />
+                Edit Invoice
+              </button>
+            )}
+            {activeInvoice.stripe_invoice_url && (
+              <a
+                href={activeInvoice.stripe_invoice_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpenDropdown(null)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-white/40" />
+                View on Stripe
+              </a>
+            )}
+            {(activeInvoice.status === 'sent' || activeInvoice.status === 'draft') && (
+              <div className="border-t border-white/[0.06] my-1" />
+            )}
+            {activeInvoice.status === 'sent' && (
+              <button
+                onClick={() => { setOpenDropdown(null); setVoidConfirmInvoice(activeInvoice) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                Void Invoice
+              </button>
+            )}
+            {activeInvoice.status === 'draft' && (
+              <button
+                onClick={() => { setOpenDropdown(null); handleDelete(activeInvoice.id) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete Invoice
+              </button>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Void Confirmation Modal */}
       {voidConfirmInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setVoidConfirmInvoice(null)}
-          />
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={() => setVoidConfirmInvoice(null)}
+        />
 
-          {/* Dialog */}
-          <div className="relative z-10 w-full max-w-md mx-4 bg-[#141414] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-            {/* Top accent */}
-            <div className="h-1 bg-gradient-to-r from-red-500 via-red-400 to-orange-400" />
+        {/* Dialog */}
+        <div className="relative z-10 w-full max-w-md mx-4 bg-[#141414] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+          {/* Top accent */}
+          <div className="h-1 bg-gradient-to-r from-red-500 via-red-400 to-orange-400" />
 
-            <div className="p-6">
-              {/* Icon + title */}
-              <div className="flex items-start gap-4 mb-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-white">Void Invoice?</h3>
-                  <p className="text-sm text-white/50 mt-0.5">{voidConfirmInvoice?.invoice_number}</p>
-                </div>
+          <div className="p-6">
+            {/* Icon + title */}
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
               </div>
-
-              {/* Warning body */}
-              <div className="bg-red-500/5 border border-red-500/20 rounded-xl px-4 py-3 mb-6">
-                <p className="text-sm text-white/70 leading-relaxed">
-                  You are about to <span className="text-red-400 font-medium">void</span> this invoice
-                  {' '}(<span className="text-white font-medium">{voidConfirmInvoice?.invoice_number}</span>).
-                  This action <span className="text-white font-medium">cannot be undone</span>.
-                  The invoice will be marked as cancelled and the client will be notified.
-                </p>
+              <div>
+                <h3 className="text-base font-semibold text-white">Void Invoice?</h3>
+                <p className="text-sm text-white/50 mt-0.5">{voidConfirmInvoice?.invoice_number}</p>
               </div>
+            </div>
 
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => setVoidConfirmInvoice(null)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => voidConfirmInvoice && handleVoid(voidConfirmInvoice.id)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center gap-2"
-                >
-                  <Ban className="w-3.5 h-3.5" />
-                  Void Invoice
-                </button>
-              </div>
+            {/* Warning body */}
+            <div className="bg-red-500/5 border border-red-500/20 rounded-xl px-4 py-3 mb-6">
+              <p className="text-sm text-white/70 leading-relaxed">
+                You are about to <span className="text-red-400 font-medium">void</span> this invoice
+                {' '}(<span className="text-white font-medium">{voidConfirmInvoice?.invoice_number}</span>).
+                This action <span className="text-white font-medium">cannot be undone</span>.
+                The invoice will be marked as cancelled and the client will be notified.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setVoidConfirmInvoice(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white/60 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => voidConfirmInvoice && handleVoid(voidConfirmInvoice.id)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center gap-2"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                Void Invoice
+              </button>
             </div>
           </div>
         </div>
+      </div>
       )}
     </>
   )
