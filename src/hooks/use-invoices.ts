@@ -189,6 +189,36 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     return data.invoice
   }
 
+  const syncStripeInvoices = async (): Promise<{
+    synced: Array<{
+      invoice_id: string
+      stripe_invoice_id: string
+      action: string
+      match_type?: string
+      stripe_invoice_number?: string | null
+      error?: string
+    }>
+    summary: {
+      total_checked: number
+      linked_from_stripe: number
+      updated_to_paid: number
+      payments_created: number
+      skipped: number
+    }
+  }> => {
+    const response = await fetch('/api/invoices/sync', {
+      method: 'POST',
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to sync Stripe invoices')
+    }
+
+    await fetchInvoices()
+    return data
+  }
+
   const totals = {
     count: invoices.length,
     totalAmount: invoices.reduce((sum, inv) => sum + Number(inv.total_amount), 0),
@@ -217,5 +247,6 @@ export function useInvoices(options: UseInvoicesOptions = {}) {
     generateProjectInvoices,
     fetchStripeInvoices,
     importStripeInvoice,
+    syncStripeInvoices,
   }
 }

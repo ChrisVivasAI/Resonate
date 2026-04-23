@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { FileText, Send, Ban, ExternalLink, Loader2, Plus, Pencil, Trash2, X, Download, MoreVertical, AlertTriangle } from 'lucide-react'
+import { FileText, Send, Ban, ExternalLink, Loader2, Plus, Pencil, Trash2, X, Download, MoreVertical, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useInvoices } from '@/hooks'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Invoice, InvoiceLineItem } from '@/types'
@@ -47,7 +47,7 @@ const emptyForm = () => ({
 })
 
 export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
-  const { invoices, loading, totals, createInvoice, updateInvoice, deleteInvoice, sendInvoice, voidInvoice, fetchStripeInvoices, importStripeInvoice } = useInvoices({ projectId })
+  const { invoices, loading, totals, createInvoice, updateInvoice, deleteInvoice, sendInvoice, voidInvoice, fetchStripeInvoices, importStripeInvoice, syncStripeInvoices } = useInvoices({ projectId })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
@@ -194,6 +194,17 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
       await deleteInvoice(id)
     } catch (err) {
       console.error('Error deleting invoice:', err)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSyncStripe = async () => {
+    setActionLoading('sync-stripe')
+    try {
+      await syncStripeInvoices()
+    } catch (err) {
+      console.error('Error syncing Stripe invoices:', err)
     } finally {
       setActionLoading(null)
     }
@@ -506,6 +517,15 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
               <div className="text-white/40">
                 Paid: <span className="text-emerald-400 font-medium">{formatCurrency(totals.paid)}</span>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={actionLoading === 'sync-stripe' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                onClick={handleSyncStripe}
+                disabled={actionLoading === 'sync-stripe'}
+              >
+                Sync Stripe
+              </Button>
               <Button variant="secondary" size="sm" leftIcon={<Download className="w-4 h-4" />} onClick={openImportPanel}>
                 Import from Stripe
               </Button>

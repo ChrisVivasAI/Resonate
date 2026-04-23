@@ -21,6 +21,7 @@ import {
   Pencil,
   Trash2,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import { DashboardLayout, Header } from '@/components/layout'
 import { Card, CardContent, Button, Input, Badge, Avatar, Tabs, TabsList, TabsTrigger, TabsContent, Modal, Select } from '@/components/ui'
@@ -44,7 +45,7 @@ const invoiceTypeLabels: Record<string, string> = {
 
 export default function PaymentsPage() {
   const { payments, loading: paymentsLoading } = usePayments()
-  const { invoices, loading: invoicesLoading, totals: invoiceTotals, createInvoice, sendInvoice, voidInvoice, deleteInvoice, updateInvoice } = useInvoices()
+  const { invoices, loading: invoicesLoading, totals: invoiceTotals, createInvoice, sendInvoice, voidInvoice, deleteInvoice, updateInvoice, syncStripeInvoices } = useInvoices()
   const { clients } = useClients()
   const { projects } = useProjects()
 
@@ -189,6 +190,17 @@ export default function PaymentsPage() {
     }
   }
 
+  const handleSyncStripe = async () => {
+    setActionLoading(true)
+    try {
+      await syncStripeInvoices()
+    } catch (err) {
+      console.error('Error syncing Stripe invoices:', err)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const openEditInvoice = (invoice: Invoice) => {
     setInvoiceForm({
       client_id: invoice.client_id,
@@ -221,9 +233,19 @@ export default function PaymentsPage() {
         title="Payments"
         description="Manage invoices, track payments, and monitor revenue."
         actions={
-          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsNewInvoiceModalOpen(true)}>
-            Create Invoice
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              leftIcon={actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              onClick={handleSyncStripe}
+              disabled={actionLoading}
+            >
+              Sync Stripe
+            </Button>
+            <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsNewInvoiceModalOpen(true)}>
+              Create Invoice
+            </Button>
+          </div>
         }
       />
 
