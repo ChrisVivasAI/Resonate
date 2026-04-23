@@ -389,9 +389,9 @@ export default function PaymentsPage() {
                                   <Ban className="w-4 h-4" />
                                 </button>
                               )}
-                              {invoice.stripe_invoice_url && (
+                              {(invoice.stripe_invoice_id || invoice.stripe_invoice_url) && (
                                 <a
-                                  href={invoice.stripe_invoice_url}
+                                  href={`/api/invoices/${invoice.id}/view`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="p-1.5 rounded-lg hover:bg-white/[0.06] text-charcoal-400 transition-colors"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getStripeInvoice } from '@/lib/stripe/server'
+import { resolveStripeInvoiceNumber } from '@/lib/invoices/numbering.mjs'
 import Stripe from 'stripe'
 
 const stripeStatusMap: Record<string, string> = {
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
         client_id: client.id,
         project_id: project_id || null,
         invoice_type: 'custom',
-        invoice_number: invoiceNumber,
+        invoice_number: resolveStripeInvoiceNumber(stripeInvoice.number, invoiceNumber),
         amount,
         tax_amount: taxAmount,
         total_amount: totalAmount,

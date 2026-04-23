@@ -38,9 +38,10 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
-      case 'invoice.paid': {
+      case 'invoice.paid':
+      case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice
-        console.log('Invoice paid:', invoice.id)
+        console.log(`${event.type}:`, invoice.id)
 
         // #1: Added total_amount, currency to select
         const { data: dbInvoice } = await supabase
@@ -51,11 +52,12 @@ export async function POST(request: NextRequest) {
 
         // #5: If not found by stripe_invoice_id, try metadata lookup
         let resolvedInvoice = dbInvoice
-        if (!resolvedInvoice && invoice.metadata?.resonate_invoice_id) {
+        const metadataId = invoice.metadata?.supabase_invoice_id || invoice.metadata?.resonate_invoice_id
+        if (!resolvedInvoice && metadataId) {
           const { data: metaInvoice } = await supabase
             .from('invoices')
             .select('id, milestone_id, amount, total_amount, currency, project_id, client_id, status')
-            .eq('id', invoice.metadata.resonate_invoice_id)
+            .eq('id', metadataId)
             .single()
           resolvedInvoice = metaInvoice
         }
@@ -69,9 +71,11 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // #8: Status guard — only process if invoice is in sent or overdue state
-        if (resolvedInvoice.status !== 'sent' && resolvedInvoice.status !== 'overdue') {
-          console.log(`Skipping invoice.paid — invoice ${resolvedInvoice.id} has status "${resolvedInvoice.status}"`)
+        // Terminal-state guard. A paid Stripe invoice should still be allowed to
+        // advance a local draft, because Stripe can deliver the webhook before
+        // the send route finishes updating our DB from draft -> sent.
+        if (resolvedInvoice.status === 'paid' || resolvedInvoice.status === 'cancelled') {
+          console.log(`Skipping ${event.type} — invoice ${resolvedInvoice.id} has status "${resolvedInvoice.status}"`)
           break
         }
 
@@ -79,10 +83,14 @@ export async function POST(request: NextRequest) {
         const stripeAmountPaid = Number(((invoice.amount_paid ?? 0) / 100).toFixed(2))
 
         // #4: Log warning if Stripe amount doesn't match DB total_amount
-        if (resolvedInvoice.total_amount != null && stripeAmountPaid !== resolvedInvoice.total_amount) {
+        const expectedTotalAmount = Number(resolvedInvoice.total_amount)
+        if (
+          Number.isFinite(expectedTotalAmount) &&
+          Math.abs(stripeAmountPaid - expectedTotalAmount) > 0.01
+        ) {
           console.warn(
             `Amount mismatch for invoice ${resolvedInvoice.id}: ` +
-            `Stripe amount_paid=${stripeAmountPaid}, DB total_amount=${resolvedInvoice.total_amount}`
+            `Stripe amount_paid=${stripeAmountPaid}, DB total_amount=${expectedTotalAmount}`
           )
         }
 
@@ -94,46 +102,53 @@ export async function POST(request: NextRequest) {
           .eq('status', 'succeeded')
           .maybeSingle()
 
-        if (existingPayment) {
-          console.log(`Payment already exists for invoice ${resolvedInvoice.id}, skipping insert`)
-          break
-        }
-
         // Use Stripe's actual payment timestamp
         const paidAt = invoice.status_transitions?.paid_at
           ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
           : new Date(event.created * 1000).toISOString()
 
-        // Insert payment record FIRST for atomicity — this has the idempotency
-        // check (unique constraint). If this succeeds but later ops fail, Stripe
-        // retries will hit the idempotency guard above and skip. If this fails,
-        // no invoice/milestone state has been changed.
-        await supabase.from('payments').insert({
-          invoice_id: resolvedInvoice.id,
-          project_id: resolvedInvoice.project_id,
-          client_id: resolvedInvoice.client_id,
-          amount: stripeAmountPaid, // #2: Use Stripe amount
-          currency: invoice.currency ?? 'usd', // #9: Use Stripe currency
-          status: 'succeeded',
-          stripe_payment_intent_id: typeof invoice.payment_intent === 'string'
-            ? invoice.payment_intent
-            : invoice.payment_intent?.id || null,
-          payment_method: 'stripe_invoice',
-          paid_at: paidAt,
-        })
+        if (existingPayment) {
+          console.log(`Payment already exists for invoice ${resolvedInvoice.id}, skipping insert`)
+        } else {
+          // Insert payment record before mutating invoice/milestone state. If this
+          // fails, Stripe retries the webhook without leaving the invoice half-paid.
+          const { error: paymentInsertError } = await supabase.from('payments').insert({
+            invoice_id: resolvedInvoice.id,
+            project_id: resolvedInvoice.project_id,
+            client_id: resolvedInvoice.client_id,
+            amount: stripeAmountPaid, // #2: Use Stripe amount
+            currency: invoice.currency ?? 'usd', // #9: Use Stripe currency
+            status: 'succeeded',
+            stripe_payment_intent_id: typeof invoice.payment_intent === 'string'
+              ? invoice.payment_intent
+              : invoice.payment_intent?.id || null,
+            payment_method: 'stripe_invoice',
+            paid_at: paidAt,
+          })
+
+          if (paymentInsertError) {
+            throw new Error(`Failed to insert payment for invoice ${resolvedInvoice.id}: ${paymentInsertError.message}`)
+          }
+        }
 
         // Update invoice status to paid
-        await supabase
+        const { error: invoiceUpdateError } = await supabase
           .from('invoices')
           .update({ status: 'paid', paid_at: paidAt })
           .eq('id', resolvedInvoice.id)
+        if (invoiceUpdateError) {
+          throw new Error(`Failed to update invoice ${resolvedInvoice.id} to paid: ${invoiceUpdateError.message}`)
+        }
 
         // If linked to a milestone, mark it as paid
         if (resolvedInvoice.milestone_id) {
-          await supabase
+          const { error: milestoneUpdateError } = await supabase
             .from('milestones')
             .update({ is_paid: true })
             .eq('id', resolvedInvoice.milestone_id)
+          if (milestoneUpdateError) {
+            throw new Error(`Failed to update milestone ${resolvedInvoice.milestone_id}: ${milestoneUpdateError.message}`)
+          }
         }
         break
       }

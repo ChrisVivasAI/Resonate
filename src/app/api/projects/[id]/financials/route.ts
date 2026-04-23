@@ -102,8 +102,8 @@ export async function GET(
     const restockingFees = returns?.reduce((sum, r) => sum + Number(r.restocking_fee || 0), 0) || 0
 
     const adjustedInternalCost = totalInternalCost - returnsCompleted + reimbursementsPaid
-    const grossProfit = paidInvoices - adjustedInternalCost
-    const profitMargin = paidInvoices > 0 ? (grossProfit / paidInvoices) * 100 : 0
+    const grossProfit = totalInvoiced - adjustedInternalCost
+    const profitMargin = totalInvoiced > 0 ? (grossProfit / totalInvoiced) * 100 : 0
 
     // Remaining budget uses the greater of invoiced or expense charges to avoid underreporting
     const remainingBudget = clientBudget - Math.max(totalInvoiced, totalClientCharges)

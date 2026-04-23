@@ -1083,8 +1083,8 @@ export default function ProjectDetailPage() {
                                               {invoiceActionLoading === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                                             </button>
                                           )}
-                                          {inv.stripe_invoice_url && (
-                                            <a href={inv.stripe_invoice_url} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-white/[0.06] text-white/40 transition-colors" title="View on Stripe">
+                                          {(inv.stripe_invoice_id || inv.stripe_invoice_url) && (
+                                            <a href={`/api/invoices/${inv.id}/view`} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-white/[0.06] text-white/40 transition-colors" title="View on Stripe">
                                               <ExternalLink className="w-3.5 h-3.5" />
                                             </a>
                                           )}

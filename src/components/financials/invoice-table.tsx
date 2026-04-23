@@ -625,9 +625,9 @@ export function InvoiceTable({ projectId, clientId }: InvoiceTableProps) {
                 Edit Invoice
               </button>
             )}
-            {activeInvoice.stripe_invoice_url && (
+            {(activeInvoice.stripe_invoice_id || activeInvoice.stripe_invoice_url) && (
               <a
-                href={activeInvoice.stripe_invoice_url}
+                href={`/api/invoices/${activeInvoice.id}/view`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setOpenDropdown(null)}
